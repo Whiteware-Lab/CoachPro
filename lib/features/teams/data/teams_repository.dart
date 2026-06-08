@@ -66,9 +66,13 @@ class TeamsRepository {
     final sessions = await _teams.doc(teamId).collection('sessions').get();
     for (final session in sessions.docs) {
       final splits = await session.reference.collection('splits').get();
+      final notes = await session.reference.collection('notes').get();
       final batch = _firestore.batch();
       for (final split in splits.docs) {
         batch.delete(split.reference);
+      }
+      for (final note in notes.docs) {
+        batch.delete(note.reference);
       }
       batch.delete(session.reference);
       await batch.commit();

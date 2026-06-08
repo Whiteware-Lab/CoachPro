@@ -1,7 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:coachpro/core/utils/date_format.dart';
 import 'package:coachpro/features/sessions/domain/session.dart';
-import 'package:coachpro/features/sessions/domain/session_status.dart';
-import 'package:coachpro/features/sessions/domain/session_type.dart';
+import 'package:coachpro/features/sessions/domain/session_kind.dart';
+import 'package:coachpro/features/sessions/domain/session_note.dart';
 import 'package:coachpro/features/sessions/domain/split.dart';
 
 class SessionsRepository {
@@ -18,6 +19,12 @@ class SessionsRepository {
     String sessionId,
   ) =>
       _sessions(teamId).doc(sessionId).collection('splits');
+
+  CollectionReference<Map<String, dynamic>> _notes(
+    String teamId,
+    String sessionId,
+  ) =>
+      _sessions(teamId).doc(sessionId).collection('notes');
 
   Stream<List<Session>> watchSessions(String teamId) {
     return _sessions(teamId)
@@ -55,28 +62,33 @@ class SessionsRepository {
         );
   }
 
+  Stream<List<SessionNote>> watchNotes({
+    required String teamId,
+    required String sessionId,
+  }) {
+    return _notes(teamId, sessionId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(SessionNote.fromFirestore)
+              .toList(growable: false),
+        );
+  }
+
   Future<Session> createSession({
     required String teamId,
-    required String name,
-    required SessionType type,
-    required List<String> presentAthleteIds,
+    required SessionKind kind,
+    required DateTime sessionDate,
     required String createdBy,
   }) async {
-    if (name.trim().isEmpty) {
-      throw SessionsException('Il nome della sessione è obbligatorio.');
-    }
-    if (presentAthleteIds.isEmpty) {
-      throw SessionsException('Seleziona almeno un atleta presente.');
-    }
-
     final docRef = _sessions(teamId).doc();
     final session = Session(
       id: docRef.id,
       teamId: teamId,
-      name: name.trim(),
-      type: type,
-      status: SessionStatus.active,
-      presentAthleteIds: presentAthleteIds,
+      kind: kind,
+      sessionDate: dateOnly(sessionDate),
+      presentAthleteIds: const [],
       finishedAthleteIds: const [],
       createdBy: createdBy,
       createdAt: DateTime.now(),
@@ -86,27 +98,26 @@ class SessionsRepository {
     return session;
   }
 
-  Future<void> startSession({
+  Future<void> updatePresentAthletes({
+    required String teamId,
+    required String sessionId,
+    required List<String> presentAthleteIds,
+  }) {
+    return _sessions(teamId).doc(sessionId).update({
+      'presentAthleteIds': presentAthleteIds,
+    });
+  }
+
+  Future<void> startLapTimer({
     required String teamId,
     required String sessionId,
   }) async {
     await _sessions(teamId).doc(sessionId).update({
-      'startedAt': FieldValue.serverTimestamp(),
-      'status': SessionStatus.active.value,
+      'lapTimerStartedAt': FieldValue.serverTimestamp(),
     });
   }
 
-  Future<void> completeSession({
-    required String teamId,
-    required String sessionId,
-  }) async {
-    await _sessions(teamId).doc(sessionId).update({
-      'endedAt': FieldValue.serverTimestamp(),
-      'status': SessionStatus.completed.value,
-    });
-  }
-
-  Future<void> resetSession({
+  Future<void> resetLapTimer({
     required String teamId,
     required String sessionId,
   }) async {
@@ -116,12 +127,42 @@ class SessionsRepository {
       batch.delete(doc.reference);
     }
     batch.update(_sessions(teamId).doc(sessionId), {
-      'startedAt': FieldValue.delete(),
-      'endedAt': FieldValue.delete(),
+      'lapTimerStartedAt': FieldValue.delete(),
       'finishedAthleteIds': [],
-      'status': SessionStatus.active.value,
     });
     await batch.commit();
+  }
+
+  Future<void> startSimpleTimer({
+    required String teamId,
+    required String sessionId,
+    required int baseElapsedMs,
+  }) {
+    return _sessions(teamId).doc(sessionId).update({
+      'simpleTimerStartedAt': FieldValue.serverTimestamp(),
+      'simpleTimerElapsedMs': baseElapsedMs,
+    });
+  }
+
+  Future<void> stopSimpleTimer({
+    required String teamId,
+    required String sessionId,
+    required int elapsedMs,
+  }) {
+    return _sessions(teamId).doc(sessionId).update({
+      'simpleTimerStartedAt': FieldValue.delete(),
+      'simpleTimerElapsedMs': elapsedMs,
+    });
+  }
+
+  Future<void> resetSimpleTimer({
+    required String teamId,
+    required String sessionId,
+  }) {
+    return _sessions(teamId).doc(sessionId).update({
+      'simpleTimerStartedAt': FieldValue.delete(),
+      'simpleTimerElapsedMs': FieldValue.delete(),
+    });
   }
 
   Future<void> recordSplit({
@@ -147,23 +188,61 @@ class SessionsRepository {
     required String teamId,
     required String sessionId,
     required String athleteId,
-  }) async {
-    await _sessions(teamId).doc(sessionId).update({
+  }) {
+    return _sessions(teamId).doc(sessionId).update({
       'finishedAthleteIds': FieldValue.arrayUnion([athleteId]),
     });
+  }
+
+  Future<void> addNote({
+    required String teamId,
+    required String sessionId,
+    required String title,
+    required String content,
+  }) async {
+    if (title.trim().isEmpty) {
+      throw SessionsException('Il titolo della nota è obbligatorio.');
+    }
+
+    await _notes(teamId, sessionId).add({
+      'title': title.trim(),
+      'content': content.trim(),
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> updateNote({
+    required String teamId,
+    required String sessionId,
+    required String noteId,
+    required String title,
+    required String content,
+  }) async {
+    if (title.trim().isEmpty) {
+      throw SessionsException('Il titolo della nota è obbligatorio.');
+    }
+
+    await _notes(teamId, sessionId).doc(noteId).update({
+      'title': title.trim(),
+      'content': content.trim(),
+    });
+  }
+
+  Future<void> deleteNote({
+    required String teamId,
+    required String sessionId,
+    required String noteId,
+  }) {
+    return _notes(teamId, sessionId).doc(noteId).delete();
   }
 
   Future<void> deleteSession({
     required String teamId,
     required String sessionId,
   }) async {
-    final splits = await _splits(teamId, sessionId).get();
-    final batch = _firestore.batch();
-    for (final doc in splits.docs) {
-      batch.delete(doc.reference);
-    }
-    batch.delete(_sessions(teamId).doc(sessionId));
-    await batch.commit();
+    await _deleteSubcollection(_splits(teamId, sessionId));
+    await _deleteSubcollection(_notes(teamId, sessionId));
+    await _sessions(teamId).doc(sessionId).delete();
   }
 
   Future<void> deleteAllSessions(String teamId) async {
@@ -171,6 +250,20 @@ class SessionsRepository {
     for (final session in sessions.docs) {
       await deleteSession(teamId: teamId, sessionId: session.id);
     }
+  }
+
+  Future<void> _deleteSubcollection(
+    CollectionReference<Map<String, dynamic>> collection,
+  ) async {
+    final snapshot = await collection.get();
+    if (snapshot.docs.isEmpty) {
+      return;
+    }
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
   }
 }
 

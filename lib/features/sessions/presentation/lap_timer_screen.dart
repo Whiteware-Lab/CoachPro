@@ -1,16 +1,14 @@
 import 'package:coachpro/app/theme/app_colors.dart';
 import 'package:coachpro/core/utils/time_format.dart';
 import 'package:coachpro/features/athletes/providers/athletes_providers.dart';
-import 'package:coachpro/features/sessions/domain/session_status.dart';
-import 'package:coachpro/features/sessions/providers/sessions_providers.dart';
 import 'package:coachpro/features/sessions/presentation/widgets/athlete_timer_button.dart';
+import 'package:coachpro/features/sessions/providers/sessions_providers.dart';
 import 'package:coachpro/features/sessions/providers/timer_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-class TimerScreen extends ConsumerStatefulWidget {
-  const TimerScreen({
+class LapTimerScreen extends ConsumerStatefulWidget {
+  const LapTimerScreen({
     required this.teamId,
     required this.sessionId,
     super.key,
@@ -20,10 +18,10 @@ class TimerScreen extends ConsumerStatefulWidget {
   final String sessionId;
 
   @override
-  ConsumerState<TimerScreen> createState() => _TimerScreenState();
+  ConsumerState<LapTimerScreen> createState() => _LapTimerScreenState();
 }
 
-class _TimerScreenState extends ConsumerState<TimerScreen> {
+class _LapTimerScreenState extends ConsumerState<LapTimerScreen> {
   DateTime? _lastTapAt;
   bool _hasSynced = false;
 
@@ -33,36 +31,22 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
       );
 
   Future<void> _startTimer() async {
-    final repository = ref.read(sessionsRepositoryProvider);
     final session = ref.read(sessionProvider(_sessionKey)).value;
     if (session == null) {
       return;
     }
 
-    if (session.startedAt == null) {
-      await repository.startSession(
-        teamId: widget.teamId,
-        sessionId: widget.sessionId,
-      );
+    if (session.lapTimerStartedAt == null) {
+      await ref.read(sessionsRepositoryProvider).startLapTimer(
+            teamId: widget.teamId,
+            sessionId: widget.sessionId,
+          );
     }
     ref.read(timerProvider.notifier).start();
   }
 
   Future<void> _stopTimer() async {
     ref.read(timerProvider.notifier).stop();
-    await ref.read(sessionsRepositoryProvider).completeSession(
-          teamId: widget.teamId,
-          sessionId: widget.sessionId,
-        );
-    if (mounted) {
-      context.pushReplacementNamed(
-        'session-detail',
-        pathParameters: {
-          'teamId': widget.teamId,
-          'sessionId': widget.sessionId,
-        },
-      );
-    }
   }
 
   Future<void> _resetTimer() async {
@@ -73,7 +57,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         builder: (context) => AlertDialog(
           title: const Text('Reset cronometro'),
           content: const Text(
-            'Vuoi azzerare il cronometro e cancellare tutti i parziali registrati?',
+            'Vuoi azzerare il cronometro e cancellare tutti i parziali?',
           ),
           actions: [
             TextButton(
@@ -93,7 +77,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
     }
 
     ref.read(timerProvider.notifier).reset();
-    await ref.read(sessionsRepositoryProvider).resetSession(
+    await ref.read(sessionsRepositoryProvider).resetLapTimer(
           teamId: widget.teamId,
           sessionId: widget.sessionId,
         );
@@ -117,20 +101,12 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         );
   }
 
-  Future<void> _markAthleteFinished(String athleteId) async {
-    await ref.read(sessionsRepositoryProvider).markAthleteFinished(
-          teamId: widget.teamId,
-          sessionId: widget.sessionId,
-          athleteId: athleteId,
-        );
-  }
-
   Future<void> _confirmFinishAthlete(String athleteId, String name) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Fine atleta'),
-        content: Text('Segnare $name come completato per questa sessione?'),
+        content: Text('Segnare $name come completato?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -144,7 +120,11 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
       ),
     );
     if (confirmed == true) {
-      await _markAthleteFinished(athleteId);
+      await ref.read(sessionsRepositoryProvider).markAthleteFinished(
+            teamId: widget.teamId,
+            sessionId: widget.sessionId,
+            athleteId: athleteId,
+          );
     }
   }
 
@@ -160,11 +140,10 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
       if (session == null || _hasSynced) {
         return;
       }
-      if (session.startedAt != null) {
+      if (session.lapTimerStartedAt != null) {
         _hasSynced = true;
         ref.read(timerProvider.notifier).syncFromSessionStart(
-              session.startedAt,
-              isCompleted: session.status == SessionStatus.completed,
+              session.lapTimerStartedAt,
             );
       }
     });
@@ -173,8 +152,29 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
       data: (session) {
         final splits = splitsAsync.value ?? [];
         final athletes = athletesAsync.value ?? [];
-        final isCompleted = session.status == SessionStatus.completed;
-        final canInteract = !isCompleted && timer.isRunning;
+        final canInteract = timer.isRunning;
+
+        if (session.presentAthleteIds.isEmpty) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Cronometro lap')),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.how_to_reg, size: 64),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Segna prima le presenze per usare il cronometro lap.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
 
         final activeAthletes = sortAthletesForTimer(
           athletes: athletes,
@@ -189,23 +189,7 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
         );
 
         return Scaffold(
-          appBar: AppBar(
-            title: Text(session.name),
-            actions: [
-              if (isCompleted)
-                IconButton(
-                  onPressed: () => context.pushNamed(
-                    'session-detail',
-                    pathParameters: {
-                      'teamId': widget.teamId,
-                      'sessionId': widget.sessionId,
-                    },
-                  ),
-                  icon: const Icon(Icons.summarize_outlined),
-                  tooltip: 'Riepilogo',
-                ),
-            ],
-          ),
+          appBar: AppBar(title: const Text('Cronometro lap')),
           body: Column(
             children: [
               Container(
@@ -239,34 +223,29 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        if (!isCompleted) ...[
-                          FilledButton.icon(
-                            onPressed: timer.isRunning ? null : _startTimer,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.secondary,
-                            ),
-                            icon: const Icon(Icons.play_arrow),
-                            label: const Text('Start'),
+                        FilledButton.icon(
+                          onPressed: timer.isRunning ? null : _startTimer,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.secondary,
                           ),
-                          const SizedBox(width: 12),
-                          FilledButton.icon(
-                            onPressed: timer.isRunning ? _stopTimer : null,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFFE65100),
-                            ),
-                            icon: const Icon(Icons.stop),
-                            label: const Text('Stop'),
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text('Start'),
+                        ),
+                        const SizedBox(width: 12),
+                        FilledButton.icon(
+                          onPressed: timer.isRunning ? _stopTimer : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFE65100),
                           ),
-                          const SizedBox(width: 12),
-                          OutlinedButton.icon(
-                            onPressed: _resetTimer,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Reset'),
-                          ),
-                        ] else
-                          const Chip(
-                            label: Text('Sessione completata'),
-                          ),
+                          icon: const Icon(Icons.stop),
+                          label: const Text('Stop'),
+                        ),
+                        const SizedBox(width: 12),
+                        OutlinedButton.icon(
+                          onPressed: _resetTimer,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Reset'),
+                        ),
                       ],
                     ),
                   ],
@@ -276,18 +255,18 @@ class _TimerScreenState extends ConsumerState<TimerScreen> {
                 child: ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
-                    if (!timer.isRunning && !isCompleted)
+                    if (!timer.isRunning)
                       const Card(
                         child: Padding(
                           padding: EdgeInsets.all(12),
                           child: Text(
-                            'Premi Start per avviare il cronometro, poi tocca '
-                            'un atleta per registrare un parziale. Tieni premuto '
-                            'per segnare l\'atleta come completato.',
+                            'Premi Start, poi tocca un atleta per registrare un '
+                            'parziale. Tieni premuto per segnarlo come completato.',
                           ),
                         ),
                       ),
                     if (activeAthletes.isNotEmpty) ...[
+                      const SizedBox(height: 8),
                       Text(
                         'In gara',
                         style: Theme.of(context).textTheme.titleMedium,

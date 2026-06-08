@@ -1,9 +1,12 @@
 import 'package:coachpro/features/athletes/presentation/athletes_screen.dart';
 import 'package:coachpro/features/auth/presentation/login_screen.dart';
 import 'package:coachpro/features/auth/providers/auth_providers.dart';
+import 'package:coachpro/features/sessions/presentation/lap_timer_screen.dart';
 import 'package:coachpro/features/sessions/presentation/new_session_screen.dart';
-import 'package:coachpro/features/sessions/presentation/session_detail_screen.dart';
-import 'package:coachpro/features/sessions/presentation/timer_screen.dart';
+import 'package:coachpro/features/sessions/presentation/session_attendance_screen.dart';
+import 'package:coachpro/features/sessions/presentation/session_hub_screen.dart';
+import 'package:coachpro/features/sessions/presentation/session_notes_screen.dart';
+import 'package:coachpro/features/sessions/presentation/simple_timer_screen.dart';
 import 'package:coachpro/features/teams/presentation/team_detail_screen.dart';
 import 'package:coachpro/features/teams/presentation/teams_screen.dart';
 import 'package:flutter/material.dart';
@@ -68,20 +71,46 @@ final routerProvider = Provider<GoRouter>((ref) {
                 ),
               ),
               GoRoute(
-                name: 'session-timer',
-                path: 'sessions/:sessionId/timer',
-                builder: (context, state) => TimerScreen(
-                  teamId: state.pathParameters['teamId']!,
-                  sessionId: state.pathParameters['sessionId']!,
-                ),
-              ),
-              GoRoute(
-                name: 'session-detail',
+                name: 'session-hub',
                 path: 'sessions/:sessionId',
-                builder: (context, state) => SessionDetailScreen(
+                builder: (context, state) => SessionHubScreen(
                   teamId: state.pathParameters['teamId']!,
                   sessionId: state.pathParameters['sessionId']!,
                 ),
+                routes: [
+                  GoRoute(
+                    name: 'session-lap-timer',
+                    path: 'lap-timer',
+                    builder: (context, state) => LapTimerScreen(
+                      teamId: state.pathParameters['teamId']!,
+                      sessionId: state.pathParameters['sessionId']!,
+                    ),
+                  ),
+                  GoRoute(
+                    name: 'session-simple-timer',
+                    path: 'simple-timer',
+                    builder: (context, state) => SimpleTimerScreen(
+                      teamId: state.pathParameters['teamId']!,
+                      sessionId: state.pathParameters['sessionId']!,
+                    ),
+                  ),
+                  GoRoute(
+                    name: 'session-attendance',
+                    path: 'attendance',
+                    builder: (context, state) => SessionAttendanceScreen(
+                      teamId: state.pathParameters['teamId']!,
+                      sessionId: state.pathParameters['sessionId']!,
+                    ),
+                  ),
+                  GoRoute(
+                    name: 'session-notes',
+                    path: 'notes',
+                    builder: (context, state) => SessionNotesScreen(
+                      teamId: state.pathParameters['teamId']!,
+                      sessionId: state.pathParameters['sessionId']!,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -1,6 +1,7 @@
 import 'package:coachpro/features/athletes/domain/athlete.dart';
 import 'package:coachpro/features/sessions/data/sessions_repository.dart';
 import 'package:coachpro/features/sessions/domain/session.dart';
+import 'package:coachpro/features/sessions/domain/session_note.dart';
 import 'package:coachpro/features/sessions/domain/split.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,6 +24,14 @@ final sessionProvider = StreamProvider.family<Session, SessionKey>((ref, key) {
 final splitsProvider =
     StreamProvider.family<List<Split>, SessionKey>((ref, key) {
   return ref.watch(sessionsRepositoryProvider).watchSplits(
+        teamId: key.teamId,
+        sessionId: key.sessionId,
+      );
+});
+
+final sessionNotesProvider =
+    StreamProvider.family<List<SessionNote>, SessionKey>((ref, key) {
+  return ref.watch(sessionsRepositoryProvider).watchNotes(
         teamId: key.teamId,
         sessionId: key.sessionId,
       );

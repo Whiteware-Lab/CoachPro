@@ -62,6 +62,10 @@ service cloud.firestore {
         match /splits/{splitId} {
           allow read, write: if isCoach(teamId);
         }
+
+        match /notes/{noteId} {
+          allow read, write: if isCoach(teamId);
+        }
       }
 
       match /invites/{inviteId} {

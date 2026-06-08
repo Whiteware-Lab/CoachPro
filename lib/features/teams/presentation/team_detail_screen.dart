@@ -1,7 +1,6 @@
 import 'package:coachpro/app/theme/app_colors.dart';
 import 'package:coachpro/features/athletes/providers/athletes_providers.dart';
 import 'package:coachpro/features/auth/providers/auth_providers.dart';
-import 'package:coachpro/features/sessions/domain/session_status.dart';
 import 'package:coachpro/features/sessions/presentation/widgets/session_card.dart';
 import 'package:coachpro/features/sessions/providers/sessions_providers.dart';
 import 'package:coachpro/features/teams/data/teams_repository.dart';
@@ -266,7 +265,7 @@ class TeamDetailScreen extends ConsumerWidget {
                     );
                   }
 
-                  final recent = sessions.take(5).toList();
+                  final recent = sessions;
                   return Column(
                     children: [
                       ...recent.map(
@@ -274,36 +273,16 @@ class TeamDetailScreen extends ConsumerWidget {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: SessionCard(
                             session: session,
-                            onTap: () {
-                              if (session.status == SessionStatus.active) {
-                                context.pushNamed(
-                                  'session-timer',
-                                  pathParameters: {
-                                    'teamId': team.id,
-                                    'sessionId': session.id,
-                                  },
-                                );
-                              } else {
-                                context.pushNamed(
-                                  'session-detail',
-                                  pathParameters: {
-                                    'teamId': team.id,
-                                    'sessionId': session.id,
-                                  },
-                                );
-                              }
-                            },
+                            onTap: () => context.pushNamed(
+                              'session-hub',
+                              pathParameters: {
+                                'teamId': team.id,
+                                'sessionId': session.id,
+                              },
+                            ),
                           ),
                         ),
                       ),
-                      if (sessions.length > 5)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            '+ ${sessions.length - 5} altre sessioni',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
                     ],
                   );
                 },

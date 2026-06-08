@@ -41,22 +41,13 @@ class TimerNotifier extends StateNotifier<TimerState> {
 
   Timer? _ticker;
 
-  void syncFromSessionStart(DateTime? startedAt, {required bool isCompleted}) {
+  void syncFromSessionStart(DateTime? startedAt, {int baseElapsedMs = 0}) {
     if (startedAt == null) {
       return;
     }
 
-    if (isCompleted) {
-      _stopTicker();
-      state = TimerState(
-        elapsedMs: DateTime.now().difference(startedAt).inMilliseconds,
-        isRunning: false,
-        baseElapsedMs: DateTime.now().difference(startedAt).inMilliseconds,
-      );
-      return;
-    }
-
-    final elapsed = DateTime.now().difference(startedAt).inMilliseconds;
+    final elapsed =
+        baseElapsedMs + DateTime.now().difference(startedAt).inMilliseconds;
     state = TimerState(
       elapsedMs: elapsed,
       isRunning: true,
@@ -64,6 +55,14 @@ class TimerNotifier extends StateNotifier<TimerState> {
       baseElapsedMs: elapsed,
     );
     _startTicker();
+  }
+
+  void setElapsed(int elapsedMs) {
+    _stopTicker();
+    state = TimerState(
+      elapsedMs: elapsedMs,
+      baseElapsedMs: elapsedMs,
+    );
   }
 
   void start() {

@@ -1,7 +1,6 @@
 import 'package:coachpro/app/theme/app_colors.dart';
-import 'package:coachpro/core/utils/time_format.dart';
 import 'package:coachpro/features/sessions/domain/session.dart';
-import 'package:coachpro/features/sessions/domain/session_status.dart';
+import 'package:coachpro/features/sessions/domain/session_kind.dart';
 import 'package:flutter/material.dart';
 
 class SessionCard extends StatelessWidget {
@@ -16,7 +15,7 @@ class SessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = session.status == SessionStatus.active;
+    final isGara = session.kind == SessionKind.gara;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -27,8 +26,8 @@ class SessionCard extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                isActive ? Icons.timer : Icons.check_circle_outline,
-                color: isActive ? AppColors.secondary : AppColors.success,
+                isGara ? Icons.emoji_events : Icons.fitness_center,
+                color: isGara ? AppColors.secondary : AppColors.primary,
                 size: 32,
               ),
               const SizedBox(width: 16),
@@ -37,31 +36,18 @@ class SessionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      session.name,
+                      session.displayTitle,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${session.type.label} · '
-                      '${session.presentAthleteIds.length} atleti · '
-                      '${_formatDate(session.createdAt)}',
+                      '${session.presentAthleteIds.length} presenti',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    if (session.startedAt != null && session.endedAt != null)
-                      Text(
-                        'Durata: ${formatElapsedMs(session.endedAt!.difference(session.startedAt!).inMilliseconds)}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
                   ],
                 ),
-              ),
-              Chip(
-                label: Text(isActive ? 'In corso' : 'Completata'),
-                backgroundColor: isActive
-                    ? AppColors.secondaryContainer
-                    : AppColors.primaryContainer,
               ),
               const Icon(Icons.chevron_right),
             ],
@@ -69,11 +55,5 @@ class SessionCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    return '$day/$month/${date.year}';
   }
 }
