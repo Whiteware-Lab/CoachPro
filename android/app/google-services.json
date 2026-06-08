@@ -12,7 +12,28 @@
           "package_name": "com.coachpro.coachpro"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1061111870719-6kide6p1ln45np5g11s2otl1mj6cecrm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.coachpro.coachpro",
+            "certificate_hash": "007a13821f71450cd4b116cc6a6af1d54c60f44d"
+          }
+        },
+        {
+          "client_id": "1061111870719-t7n1e9mhicc9cpnmm1g8scktkbsi6bdn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.coachpro.coachpro",
+            "certificate_hash": "02b6069a4935fca81162e25a155deac5632fa391"
+          }
+        },
+        {
+          "client_id": "1061111870719-2jmcei1cul9nuqme62i0g9asminhrvcf.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCVsD1WwOzrIRe_tH-68-lxbVovd-FuvQE"
@@ -20,7 +41,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1061111870719-2jmcei1cul9nuqme62i0g9asminhrvcf.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
