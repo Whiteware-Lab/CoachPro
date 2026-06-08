@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1061111870719",
+    "project_id": "coachpro-atletica",
+    "storage_bucket": "coachpro-atletica.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1061111870719:android:5fcab1ccda3282ce2548ca",
+        "android_client_info": {
+          "package_name": "com.coachpro.coachpro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCVsD1WwOzrIRe_tH-68-lxbVovd-FuvQE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

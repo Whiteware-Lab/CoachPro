@@ -1,0 +1,85 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function teamData(teamId) {
+      return get(/databases/$(database)/documents/teams/$(teamId)).data;
+    }
+
+    function isCoach(teamId) {
+      return isSignedIn() && request.auth.uid in teamData(teamId).coachIds;
+    }
+
+    function isTeamCreator(teamId) {
+      return isSignedIn() && request.auth.uid == teamData(teamId).createdBy;
+    }
+
+    function inviteRef(teamId, email) {
+      return /databases/$(database)/documents/teams/$(teamId)/invites/$(email);
+    }
+
+    function hasAcceptedInvite(teamId) {
+      return isSignedIn()
+        && request.auth.token.email != null
+        && exists(inviteRef(teamId, request.auth.token.email))
+        && get(inviteRef(teamId, request.auth.token.email)).data.status == 'accepted';
+    }
+
+    function isJoiningViaAcceptedInvite(teamId) {
+      return isSignedIn()
+        && request.auth.uid in request.resource.data.coachIds
+        && !(request.auth.uid in resource.data.coachIds)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coachIds'])
+        && request.resource.data.coachIds.size() == resource.data.coachIds.size() + 1
+        && hasAcceptedInvite(teamId);
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    match /teams/{teamId} {
+      allow read: if isCoach(teamId);
+      allow create: if isSignedIn()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.coachIds;
+      allow update: if isCoach(teamId) || isJoiningViaAcceptedInvite(teamId);
+      allow delete: if isTeamCreator(teamId);
+
+      match /athletes/{athleteId} {
+        allow read, write: if isCoach(teamId);
+      }
+
+      match /sessions/{sessionId} {
+        allow read, write: if isCoach(teamId);
+
+        match /splits/{splitId} {
+          allow read, write: if isCoach(teamId);
+        }
+      }
+
+      match /invites/{inviteId} {
+        allow read: if isCoach(teamId)
+          || (isSignedIn() && resource.data.email == request.auth.token.email);
+        allow create: if isCoach(teamId);
+        allow update: if isCoach(teamId)
+          || (isSignedIn()
+            && resource.data.email == request.auth.token.email
+            && resource.data.status == 'pending'
+            && request.resource.data.status == 'accepted'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
+        allow delete: if isCoach(teamId);
+      }
+    }
+
+    match /{path=**}/invites/{inviteId} {
+      allow read: if isSignedIn() && resource.data.email == request.auth.token.email;
+    }
+  }
+}

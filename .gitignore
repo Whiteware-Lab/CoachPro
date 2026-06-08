@@ -2,6 +2,8 @@
 *.class
 *.lock
 *.log
+.idea/
+*.iml
 *.pyc
 *.swp
 .buildlog/
