@@ -3,6 +3,7 @@ import 'package:coachpro/features/sessions/data/sessions_repository.dart';
 import 'package:coachpro/features/sessions/domain/session.dart';
 import 'package:coachpro/features/sessions/domain/session_note.dart';
 import 'package:coachpro/features/sessions/domain/split.dart';
+import 'package:coachpro/features/sessions/domain/sub_session.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final sessionsRepositoryProvider = Provider<SessionsRepository>(
@@ -21,11 +22,29 @@ final sessionProvider = StreamProvider.family<Session, SessionKey>((ref, key) {
       );
 });
 
-final splitsProvider =
-    StreamProvider.family<List<Split>, SessionKey>((ref, key) {
-  return ref.watch(sessionsRepositoryProvider).watchSplits(
+final subSessionsProvider =
+    StreamProvider.family<List<SubSession>, SessionKey>((ref, key) {
+  return ref.watch(sessionsRepositoryProvider).watchSubSessions(
         teamId: key.teamId,
         sessionId: key.sessionId,
+      );
+});
+
+final subSessionProvider =
+    StreamProvider.family<SubSession, SubSessionKey>((ref, key) {
+  return ref.watch(sessionsRepositoryProvider).watchSubSession(
+        teamId: key.teamId,
+        sessionId: key.sessionId,
+        subSessionId: key.subSessionId,
+      );
+});
+
+final subSessionSplitsProvider =
+    StreamProvider.family<List<Split>, SubSessionKey>((ref, key) {
+  return ref.watch(sessionsRepositoryProvider).watchSubSessionSplits(
+        teamId: key.teamId,
+        sessionId: key.sessionId,
+        subSessionId: key.subSessionId,
       );
 });
 
@@ -52,6 +71,32 @@ class SessionKey {
 
   @override
   int get hashCode => Object.hash(teamId, sessionId);
+}
+
+class SubSessionKey {
+  const SubSessionKey({
+    required this.teamId,
+    required this.sessionId,
+    required this.subSessionId,
+  });
+
+  final String teamId;
+  final String sessionId;
+  final String subSessionId;
+
+  SessionKey get sessionKey =>
+      SessionKey(teamId: teamId, sessionId: sessionId);
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SubSessionKey &&
+          teamId == other.teamId &&
+          sessionId == other.sessionId &&
+          subSessionId == other.subSessionId;
+
+  @override
+  int get hashCode => Object.hash(teamId, sessionId, subSessionId);
 }
 
 List<Athlete> sortAthletesForTimer({

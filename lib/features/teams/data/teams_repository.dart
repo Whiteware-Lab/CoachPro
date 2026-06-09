@@ -65,17 +65,15 @@ class TeamsRepository {
   Future<void> _deleteSessions(String teamId) async {
     final sessions = await _teams.doc(teamId).collection('sessions').get();
     for (final session in sessions.docs) {
-      final splits = await session.reference.collection('splits').get();
-      final notes = await session.reference.collection('notes').get();
-      final batch = _firestore.batch();
-      for (final split in splits.docs) {
-        batch.delete(split.reference);
+      final subSessions =
+          await session.reference.collection('subSessions').get();
+      for (final subSession in subSessions.docs) {
+        await _deleteCollection(subSession.reference.collection('splits'));
+        await subSession.reference.delete();
       }
-      for (final note in notes.docs) {
-        batch.delete(note.reference);
-      }
-      batch.delete(session.reference);
-      await batch.commit();
+      await _deleteCollection(session.reference.collection('splits'));
+      await _deleteCollection(session.reference.collection('notes'));
+      await session.reference.delete();
     }
   }
 

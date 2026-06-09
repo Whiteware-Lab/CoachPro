@@ -50,51 +50,69 @@ flutter build apk --release
 
 Le credenziali vengono salvate solo in `android/key.properties` sulla tua macchina. Conservale in un posto sicuro per configurare i secrets GitHub.
 
-## Release APK (GitHub Actions)
+## CI/CD (GitHub Actions)
 
-Il workflow [`.github/workflows/release.yml`](.github/workflows/release.yml) compila l'APK release e pubblica una GitHub Release quando viene pushato un tag `v*`.
+### CI — ogni push/PR su `main`
 
-### Creare una release
+Workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+1. `flutter analyze`
+2. `flutter test`
+3. Build APK release di smoke test (firma debug se mancano i secrets)
+4. Upload artifact APK (conservato 7 giorni)
+
+### Release — tag `v*`
+
+Workflow [`.github/workflows/release.yml`](.github/workflows/release.yml):
+
+1. Quality gate (analyze + test)
+2. Build **APK** e **AAB** firmati (richiede secrets di firma)
+3. Upload artifact (30 giorni)
+4. GitHub Release con APK + AAB allegati
+
+#### Creare una release
 
 ```bash
+# Aggiorna version in pubspec.yaml, poi:
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-L'APK viene allegato alla release con nome `coachpro-v1.0.0.apk`.
+File generati:
 
-I tag con suffisso pre-release (es. `v1.0.0-beta.1`) vengono marcati come **pre-release**.
+| File | Uso |
+|------|-----|
+| `coachpro-v1.0.0.apk` | Installazione diretta |
+| `coachpro-v1.0.0.aab` | Google Play Console |
 
-### Trigger manuale
+Tag pre-release (es. `v1.0.0-beta.1`) → GitHub Release marcata come **pre-release**.
 
-Da **Actions → Build and Release APK → Run workflow** puoi avviare una build indicando il tag (es. `v1.0.0`). Utile per testare la pipeline prima del push del tag.
+#### Release manuale (senza push tag)
 
-### Secrets consigliati (GitHub → Settings → Secrets and variables → Actions)
+**Actions → Release → Run workflow** con tag (es. `v1.0.0`).  
+Deseleziona *Publish release* per fare solo build e artifact, senza pubblicare su GitHub Releases.
 
-| Secret | Obbligatorio | Descrizione |
-|--------|--------------|-------------|
-| `GOOGLE_SERVICES_JSON` | No* | Contenuto di `google-services.json` codificato in base64 |
-| `ANDROID_KEYSTORE_BASE64` | No | Keystore di firma codificato in base64 |
-| `ANDROID_KEYSTORE_PASSWORD` | No | Password del keystore |
-| `ANDROID_KEY_ALIAS` | No | Alias della chiave |
-| `ANDROID_KEY_PASSWORD` | No | Password della chiave |
+### Secrets obbligatori per la release
 
-\* Se `android/app/google-services.json` è committato nel repository, il secret non è necessario.
+| Secret | Descrizione |
+|--------|-------------|
+| `ANDROID_KEYSTORE_BASE64` | Keystore codificato in base64 |
+| `ANDROID_KEYSTORE_PASSWORD` | Password keystore |
+| `ANDROID_KEY_ALIAS` | Alias chiave (`upload`) |
+| `ANDROID_KEY_PASSWORD` | Password chiave |
 
-Senza keystore configurato nei secrets, la CI produce un APK firmato con la debug key (solo per test).
+`google-services.json` è già nel repository — non serve un secret dedicato.
 
-### Codificare i file per i secrets
+### Codificare il keystore per GitHub
 
 PowerShell (Windows):
 
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("android/app/google-services.json"))
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("android/app/upload-keystore.jks"))
 ```
 
 Linux/macOS:
 
 ```bash
-base64 -w 0 android/app/google-services.json
 base64 -w 0 android/app/upload-keystore.jks
 ```

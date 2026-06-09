@@ -1,6 +1,9 @@
 import 'package:coachpro/app/theme/app_colors.dart';
+import 'package:coachpro/features/sessions/data/sessions_repository.dart';
 import 'package:coachpro/features/sessions/domain/session_kind.dart';
+import 'package:coachpro/features/sessions/domain/sub_session_type.dart';
 import 'package:coachpro/features/sessions/presentation/widgets/session_tool_card.dart';
+import 'package:coachpro/features/sessions/presentation/widgets/sub_session_name_dialog.dart';
 import 'package:coachpro/features/sessions/providers/sessions_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,15 +57,99 @@ class SessionHubScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _startSubSession(
+    BuildContext context,
+    WidgetRef ref,
+    SubSessionType type,
+  ) async {
+    final name = await showSubSessionNameDialog(
+      context,
+      title: type == SubSessionType.lap
+          ? 'Nuova prova lap'
+          : 'Nuova prova cronometro',
+    );
+    if (name == null || !context.mounted) {
+      return;
+    }
+
+    try {
+      final subSession =
+          await ref.read(sessionsRepositoryProvider).createSubSession(
+                teamId: teamId,
+                sessionId: sessionId,
+                name: name,
+                type: type,
+              );
+      if (!context.mounted) {
+        return;
+      }
+
+      final route = type == SubSessionType.lap
+          ? 'session-lap-timer'
+          : 'session-simple-timer';
+      context.pushNamed(
+        route,
+        pathParameters: {
+          'teamId': teamId,
+          'sessionId': sessionId,
+          'subSessionId': subSession.id,
+        },
+      );
+    } on SessionsException catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.message)),
+        );
+      }
+    }
+  }
+
+  void _openSubSession(
+    BuildContext context,
+    SubSessionType type,
+    String subSessionId, {
+    required bool isActive,
+  }) {
+    if (isActive) {
+      final route = type == SubSessionType.lap
+          ? 'session-lap-timer'
+          : 'session-simple-timer';
+      context.pushNamed(
+        route,
+        pathParameters: {
+          'teamId': teamId,
+          'sessionId': sessionId,
+          'subSessionId': subSessionId,
+        },
+      );
+      return;
+    }
+
+    context.pushNamed(
+      'sub-session-detail',
+      pathParameters: {
+        'teamId': teamId,
+        'sessionId': sessionId,
+        'subSessionId': subSessionId,
+      },
+    );
+  }
+
+  String _formatTime(DateTime date) {
+    final h = date.hour.toString().padLeft(2, '0');
+    final m = date.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionAsync = ref.watch(sessionProvider(_sessionKey));
-    final splitsAsync = ref.watch(splitsProvider(_sessionKey));
+    final subSessionsAsync = ref.watch(subSessionsProvider(_sessionKey));
     final notesAsync = ref.watch(sessionNotesProvider(_sessionKey));
 
     return sessionAsync.when(
       data: (session) {
-        final splitCount = splitsAsync.value?.length ?? 0;
+        final subSessions = subSessionsAsync.value ?? [];
         final noteCount = notesAsync.value?.length ?? 0;
         final presentCount = session.presentAthleteIds.length;
 
@@ -134,31 +221,23 @@ class SessionHubScreen extends ConsumerWidget {
                   SessionToolCard(
                     icon: Icons.timer,
                     title: 'Cronometro lap',
-                    subtitle: splitCount > 0
-                        ? '$splitCount parziali registrati'
-                        : 'Parziali per atleta',
+                    subtitle: 'Parziali multipli',
                     color: AppColors.secondary,
-                    onTap: () => context.pushNamed(
-                      'session-lap-timer',
-                      pathParameters: {
-                        'teamId': teamId,
-                        'sessionId': sessionId,
-                      },
+                    onTap: () => _startSubSession(
+                      context,
+                      ref,
+                      SubSessionType.lap,
                     ),
                   ),
                   SessionToolCard(
                     icon: Icons.av_timer,
                     title: 'Cronometro',
-                    subtitle: session.simpleTimerElapsedMs != null
-                        ? 'Ultimo tempo salvato'
-                        : 'Start / stop semplice',
+                    subtitle: 'Un tap per atleta',
                     color: AppColors.primary,
-                    onTap: () => context.pushNamed(
-                      'session-simple-timer',
-                      pathParameters: {
-                        'teamId': teamId,
-                        'sessionId': sessionId,
-                      },
+                    onTap: () => _startSubSession(
+                      context,
+                      ref,
+                      SubSessionType.simple,
                     ),
                   ),
                   SessionToolCard(
@@ -193,6 +272,51 @@ class SessionHubScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 24),
+              Text(
+                'Storico prove',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              if (subSessionsAsync.isLoading)
+                const Center(child: CircularProgressIndicator())
+              else if (subSessions.isEmpty)
+                const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      'Nessuna prova registrata. Avvia un cronometro per iniziare.',
+                    ),
+                  ),
+                )
+              else
+                ...subSessions.map(
+                  (subSession) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      leading: Icon(
+                        subSession.type == SubSessionType.lap
+                            ? Icons.timer
+                            : Icons.av_timer,
+                        color: subSession.isActive
+                            ? AppColors.secondary
+                            : AppColors.primary,
+                      ),
+                      title: Text(subSession.name),
+                      subtitle: Text(
+                        '${subSession.type.label} · ${_formatTime(subSession.createdAt)}'
+                        '${subSession.isActive ? ' · In corso' : ''}',
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _openSubSession(
+                        context,
+                        subSession.type,
+                        subSession.id,
+                        isActive: subSession.isActive,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         );

@@ -118,11 +118,13 @@ class _NewSessionScreenState extends ConsumerState<NewSessionScreen> {
               ),
             ),
             const SizedBox(height: 32),
-            FilledButton(
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
               onPressed: _isSaving ? null : _createSession,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.secondary,
-                minimumSize: const Size.fromHeight(52),
+                minimumSize: const Size(0, 52),
               ),
               child: _isSaving
                   ? const SizedBox(
@@ -134,6 +136,7 @@ class _NewSessionScreenState extends ConsumerState<NewSessionScreen> {
                       ),
                     )
                   : const Text('Crea sessione'),
+              ),
             ),
           ],
         ),

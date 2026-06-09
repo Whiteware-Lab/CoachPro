@@ -4,6 +4,8 @@ import 'package:coachpro/features/sessions/domain/session.dart';
 import 'package:coachpro/features/sessions/domain/session_kind.dart';
 import 'package:coachpro/features/sessions/domain/session_note.dart';
 import 'package:coachpro/features/sessions/domain/split.dart';
+import 'package:coachpro/features/sessions/domain/sub_session.dart';
+import 'package:coachpro/features/sessions/domain/sub_session_type.dart';
 
 class SessionsRepository {
   SessionsRepository({FirebaseFirestore? firestore})
@@ -14,11 +16,20 @@ class SessionsRepository {
   CollectionReference<Map<String, dynamic>> _sessions(String teamId) =>
       _firestore.collection('teams').doc(teamId).collection('sessions');
 
-  CollectionReference<Map<String, dynamic>> _splits(
+  CollectionReference<Map<String, dynamic>> _subSessions(
     String teamId,
     String sessionId,
   ) =>
-      _sessions(teamId).doc(sessionId).collection('splits');
+      _sessions(teamId).doc(sessionId).collection('subSessions');
+
+  CollectionReference<Map<String, dynamic>> _subSessionSplits(
+    String teamId,
+    String sessionId,
+    String subSessionId,
+  ) =>
+      _subSessions(teamId, sessionId)
+          .doc(subSessionId)
+          .collection('splits');
 
   CollectionReference<Map<String, dynamic>> _notes(
     String teamId,
@@ -49,11 +60,52 @@ class SessionsRepository {
     });
   }
 
-  Stream<List<Split>> watchSplits({
+  Stream<List<SubSession>> watchSubSessions({
     required String teamId,
     required String sessionId,
   }) {
-    return _splits(teamId, sessionId)
+    return _subSessions(teamId, sessionId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => SubSession.fromFirestore(
+                  doc,
+                  teamId: teamId,
+                  sessionId: sessionId,
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
+  Stream<SubSession> watchSubSession({
+    required String teamId,
+    required String sessionId,
+    required String subSessionId,
+  }) {
+    return _subSessions(teamId, sessionId)
+        .doc(subSessionId)
+        .snapshots()
+        .map((doc) {
+      if (!doc.exists) {
+        throw StateError('Prova non trovata');
+      }
+      return SubSession.fromFirestore(
+        doc,
+        teamId: teamId,
+        sessionId: sessionId,
+      );
+    });
+  }
+
+  Stream<List<Split>> watchSubSessionSplits({
+    required String teamId,
+    required String sessionId,
+    required String subSessionId,
+  }) {
+    return _subSessionSplits(teamId, sessionId, subSessionId)
         .orderBy('recordedAt')
         .snapshots()
         .map(
@@ -98,6 +150,32 @@ class SessionsRepository {
     return session;
   }
 
+  Future<SubSession> createSubSession({
+    required String teamId,
+    required String sessionId,
+    required String name,
+    required SubSessionType type,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw SessionsException('Il nome della prova è obbligatorio.');
+    }
+
+    final docRef = _subSessions(teamId, sessionId).doc();
+    final subSession = SubSession(
+      id: docRef.id,
+      teamId: teamId,
+      sessionId: sessionId,
+      name: trimmed,
+      type: type,
+      createdAt: DateTime.now(),
+      finishedAthleteIds: const [],
+    );
+
+    await docRef.set(subSession.toFirestore());
+    return subSession;
+  }
+
   Future<void> updatePresentAthletes({
     required String teamId,
     required String sessionId,
@@ -111,72 +189,90 @@ class SessionsRepository {
   Future<void> startLapTimer({
     required String teamId,
     required String sessionId,
-  }) async {
-    await _sessions(teamId).doc(sessionId).update({
-      'lapTimerStartedAt': FieldValue.serverTimestamp(),
+    required String subSessionId,
+  }) {
+    return _subSessions(teamId, sessionId).doc(subSessionId).update({
+      'timerStartedAt': FieldValue.serverTimestamp(),
     });
-  }
-
-  Future<void> resetLapTimer({
-    required String teamId,
-    required String sessionId,
-  }) async {
-    final splits = await _splits(teamId, sessionId).get();
-    final batch = _firestore.batch();
-    for (final doc in splits.docs) {
-      batch.delete(doc.reference);
-    }
-    batch.update(_sessions(teamId).doc(sessionId), {
-      'lapTimerStartedAt': FieldValue.delete(),
-      'finishedAthleteIds': [],
-    });
-    await batch.commit();
   }
 
   Future<void> startSimpleTimer({
     required String teamId,
     required String sessionId,
+    required String subSessionId,
     required int baseElapsedMs,
   }) {
-    return _sessions(teamId).doc(sessionId).update({
-      'simpleTimerStartedAt': FieldValue.serverTimestamp(),
-      'simpleTimerElapsedMs': baseElapsedMs,
+    return _subSessions(teamId, sessionId).doc(subSessionId).update({
+      'timerStartedAt': FieldValue.serverTimestamp(),
+      'timerElapsedMs': baseElapsedMs,
     });
   }
 
   Future<void> stopSimpleTimer({
     required String teamId,
     required String sessionId,
+    required String subSessionId,
     required int elapsedMs,
   }) {
-    return _sessions(teamId).doc(sessionId).update({
-      'simpleTimerStartedAt': FieldValue.delete(),
-      'simpleTimerElapsedMs': elapsedMs,
+    return _subSessions(teamId, sessionId).doc(subSessionId).update({
+      'timerStartedAt': FieldValue.delete(),
+      'timerElapsedMs': elapsedMs,
     });
   }
 
-  Future<void> resetSimpleTimer({
+  Future<void> endSubSession({
     required String teamId,
     required String sessionId,
+    required String subSessionId,
+    int? finalElapsedMs,
   }) {
-    return _sessions(teamId).doc(sessionId).update({
-      'simpleTimerStartedAt': FieldValue.delete(),
-      'simpleTimerElapsedMs': FieldValue.delete(),
+    final updates = <String, dynamic>{
+      'endedAt': FieldValue.serverTimestamp(),
+      'timerStartedAt': FieldValue.delete(),
+    };
+    if (finalElapsedMs != null) {
+      updates['timerElapsedMs'] = finalElapsedMs;
+    }
+    return _subSessions(teamId, sessionId).doc(subSessionId).update(updates);
+  }
+
+  Future<void> resetSubSession({
+    required String teamId,
+    required String sessionId,
+    required String subSessionId,
+  }) async {
+    final splits = await _subSessionSplits(teamId, sessionId, subSessionId).get();
+    final batch = _firestore.batch();
+    for (final doc in splits.docs) {
+      batch.delete(doc.reference);
+    }
+    batch.update(_subSessions(teamId, sessionId).doc(subSessionId), {
+      'timerStartedAt': FieldValue.delete(),
+      'timerElapsedMs': FieldValue.delete(),
+      'finishedAthleteIds': [],
     });
+    await batch.commit();
   }
 
   Future<void> recordSplit({
     required String teamId,
     required String sessionId,
+    required String subSessionId,
     required String athleteId,
     required int elapsedMs,
+    bool singleTapOnly = false,
   }) async {
-    final existing = await _splits(teamId, sessionId)
-        .where('athleteId', isEqualTo: athleteId)
-        .get();
-    final lapNumber = existing.docs.length + 1;
+    final splitsRef = _subSessionSplits(teamId, sessionId, subSessionId);
+    final existing =
+        await splitsRef.where('athleteId', isEqualTo: athleteId).get();
 
-    await _splits(teamId, sessionId).add({
+    if (singleTapOnly && existing.docs.isNotEmpty) {
+      return;
+    }
+
+    final lapNumber = singleTapOnly ? 1 : existing.docs.length + 1;
+
+    await splitsRef.add({
       'athleteId': athleteId,
       'lapNumber': lapNumber,
       'elapsedMs': elapsedMs,
@@ -187,11 +283,35 @@ class SessionsRepository {
   Future<void> markAthleteFinished({
     required String teamId,
     required String sessionId,
+    required String subSessionId,
     required String athleteId,
   }) {
-    return _sessions(teamId).doc(sessionId).update({
+    return _subSessions(teamId, sessionId).doc(subSessionId).update({
       'finishedAthleteIds': FieldValue.arrayUnion([athleteId]),
     });
+  }
+
+  Future<void> recordSimpleFinish({
+    required String teamId,
+    required String sessionId,
+    required String subSessionId,
+    required String athleteId,
+    required int elapsedMs,
+  }) async {
+    await recordSplit(
+      teamId: teamId,
+      sessionId: sessionId,
+      subSessionId: subSessionId,
+      athleteId: athleteId,
+      elapsedMs: elapsedMs,
+      singleTapOnly: true,
+    );
+    await markAthleteFinished(
+      teamId: teamId,
+      sessionId: sessionId,
+      subSessionId: subSessionId,
+      athleteId: athleteId,
+    );
   }
 
   Future<void> addNote({
@@ -236,11 +356,28 @@ class SessionsRepository {
     return _notes(teamId, sessionId).doc(noteId).delete();
   }
 
+  Future<void> deleteSubSession({
+    required String teamId,
+    required String sessionId,
+    required String subSessionId,
+  }) async {
+    await _deleteSubcollection(
+      _subSessionSplits(teamId, sessionId, subSessionId),
+    );
+    await _subSessions(teamId, sessionId).doc(subSessionId).delete();
+  }
+
   Future<void> deleteSession({
     required String teamId,
     required String sessionId,
   }) async {
-    await _deleteSubcollection(_splits(teamId, sessionId));
+    final subSessions = await _subSessions(teamId, sessionId).get();
+    for (final subSession in subSessions.docs) {
+      await _deleteSubcollection(
+        _subSessionSplits(teamId, sessionId, subSession.id),
+      );
+    }
+    await _deleteSubcollection(_subSessions(teamId, sessionId));
     await _deleteSubcollection(_notes(teamId, sessionId));
     await _sessions(teamId).doc(sessionId).delete();
   }

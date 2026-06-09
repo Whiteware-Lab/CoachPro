@@ -147,7 +147,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ],
                     const SizedBox(height: 24),
-                    FilledButton(
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
                       onPressed: _isLoading ? null : _submitEmail,
                       child: _isLoading
                           ? const SizedBox(
@@ -159,6 +161,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                             )
                           : Text(_isRegistering ? 'Registrati' : 'Accedi'),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextButton(

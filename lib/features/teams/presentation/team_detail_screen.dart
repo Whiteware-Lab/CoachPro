@@ -257,10 +257,20 @@ class TeamDetailScreen extends ConsumerWidget {
               sessionsAsync.when(
                 data: (sessions) {
                   if (sessions.isEmpty) {
-                    return const Card(
+                    return Card(
                       child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text('Nessuna sessione registrata.'),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Nessuna sessione registrata.'),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tocca "Nuova sessione" per creare il primo allenamento.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }
@@ -379,8 +389,9 @@ class TeamDetailScreen extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      loading: () => Scaffold(
+        appBar: AppBar(),
+        body: const Center(child: CircularProgressIndicator()),
       ),
       error: (error, _) => Scaffold(
         appBar: AppBar(),

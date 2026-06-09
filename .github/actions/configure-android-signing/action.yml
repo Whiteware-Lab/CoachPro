@@ -1,0 +1,35 @@
+name: Configure Android signing
+description: Decode release keystore and write android/key.properties for Gradle.
+
+inputs:
+  keystore-base64:
+    description: Base64-encoded upload keystore.
+    required: true
+  keystore-password:
+    description: Keystore password.
+    required: true
+  key-alias:
+    description: Key alias.
+    required: true
+  key-password:
+    description: Key password.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Write release keystore
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf '%s' "${{ inputs.keystore-base64 }}" | base64 --decode > android/app/upload-keystore.jks
+
+    - name: Write key.properties
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=app/upload-keystore.jks\n' \
+          "${{ inputs.keystore-password }}" \
+          "${{ inputs.key-password }}" \
+          "${{ inputs.key-alias }}" \
+          > android/key.properties

@@ -14,6 +14,14 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid in teamData(teamId).coachIds;
     }
 
+    function isCoachOfTeamResource() {
+      return isSignedIn() && request.auth.uid in resource.data.coachIds;
+    }
+
+    function authEmail() {
+      return request.auth.token.email.lower();
+    }
+
     function isTeamCreator(teamId) {
       return isSignedIn() && request.auth.uid == teamData(teamId).createdBy;
     }
@@ -25,8 +33,8 @@ service cloud.firestore {
     function hasAcceptedInvite(teamId) {
       return isSignedIn()
         && request.auth.token.email != null
-        && exists(inviteRef(teamId, request.auth.token.email))
-        && get(inviteRef(teamId, request.auth.token.email)).data.status == 'accepted';
+        && exists(inviteRef(teamId, authEmail()))
+        && get(inviteRef(teamId, authEmail())).data.status == 'accepted';
     }
 
     function isJoiningViaAcceptedInvite(teamId) {
@@ -45,7 +53,7 @@ service cloud.firestore {
     }
 
     match /teams/{teamId} {
-      allow read: if isCoach(teamId);
+      allow read: if isCoachOfTeamResource();
       allow create: if isSignedIn()
         && request.resource.data.createdBy == request.auth.uid
         && request.auth.uid in request.resource.data.coachIds;
@@ -63,6 +71,14 @@ service cloud.firestore {
           allow read, write: if isCoach(teamId);
         }
 
+        match /subSessions/{subSessionId} {
+          allow read, write: if isCoach(teamId);
+
+          match /splits/{splitId} {
+            allow read, write: if isCoach(teamId);
+          }
+        }
+
         match /notes/{noteId} {
           allow read, write: if isCoach(teamId);
         }
@@ -70,11 +86,11 @@ service cloud.firestore {
 
       match /invites/{inviteId} {
         allow read: if isCoach(teamId)
-          || (isSignedIn() && resource.data.email == request.auth.token.email);
+          || (isSignedIn() && resource.data.email == authEmail());
         allow create: if isCoach(teamId);
         allow update: if isCoach(teamId)
           || (isSignedIn()
-            && resource.data.email == request.auth.token.email
+            && resource.data.email == authEmail()
             && resource.data.status == 'pending'
             && request.resource.data.status == 'accepted'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
@@ -83,7 +99,7 @@ service cloud.firestore {
     }
 
     match /{path=**}/invites/{inviteId} {
-      allow read: if isSignedIn() && resource.data.email == request.auth.token.email;
+      allow read: if isSignedIn() && resource.data.email == authEmail();
     }
   }
 }

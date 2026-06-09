@@ -12,6 +12,7 @@ class AthleteTimerButton extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     required this.enabled,
+    this.singleTapMode = false,
     super.key,
   });
 
@@ -20,6 +21,7 @@ class AthleteTimerButton extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final bool enabled;
+  final bool singleTapMode;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +42,7 @@ class AthleteTimerButton extends StatelessWidget {
                 onTap();
               }
             : null,
-        onLongPress: enabled
+        onLongPress: enabled && !singleTapMode
             ? () {
                 HapticFeedback.heavyImpact();
                 onLongPress();
@@ -70,7 +72,9 @@ class AthleteTimerButton extends StatelessWidget {
               if (lapCount > 0) ...[
                 const SizedBox(height: 4),
                 Text(
-                  'G$lapCount: ${formatElapsedMs(lastSplit!.elapsedMs)}',
+                  singleTapMode
+                      ? formatElapsedMs(lastSplit!.elapsedMs)
+                      : 'G$lapCount: ${formatElapsedMs(lastSplit!.elapsedMs)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
@@ -88,11 +92,13 @@ class FinishedAthleteTile extends StatelessWidget {
   const FinishedAthleteTile({
     required this.athlete,
     required this.splits,
+    this.singleTapMode = false,
     super.key,
   });
 
   final Athlete athlete;
   final List<Split> splits;
+  final bool singleTapMode;
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +114,9 @@ class FinishedAthleteTile extends StatelessWidget {
       child: ListTile(
         leading: const Icon(Icons.check_circle, color: AppColors.success),
         title: Text(athlete.name),
-        subtitle: Text('${athleteSplits.length} giri'),
+        subtitle: Text(
+          singleTapMode ? 'Tempo registrato' : '${athleteSplits.length} giri',
+        ),
         trailing: Text(
           formatElapsedMs(totalMs),
           style: const TextStyle(

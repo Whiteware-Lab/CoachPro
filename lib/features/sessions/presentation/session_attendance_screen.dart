@@ -150,11 +150,10 @@ class _SessionAttendanceScreenState
                   ),
                   Padding(
                     padding: const EdgeInsets.all(16),
-                    child: FilledButton(
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
                       onPressed: _isSaving ? null : _save,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                      ),
                       child: _isSaving
                           ? const SizedBox(
                               height: 22,
@@ -165,6 +164,7 @@ class _SessionAttendanceScreenState
                               ),
                             )
                           : const Text('Salva presenze'),
+                      ),
                     ),
                   ),
                 ],

@@ -100,7 +100,9 @@ class _PendingInvitesCardState extends ConsumerState<_PendingInvitesCard> {
               ),
             ),
             const SizedBox(height: 12),
-            FilledButton(
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
               onPressed: _isProcessing ? null : _acceptAll,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.secondary,
@@ -115,6 +117,7 @@ class _PendingInvitesCardState extends ConsumerState<_PendingInvitesCard> {
                       ),
                     )
                   : const Text('Accetta tutti'),
+              ),
             ),
           ],
         ),
