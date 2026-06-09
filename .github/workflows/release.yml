@@ -155,18 +155,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p release
           cp build/app/outputs/flutter-apk/app-release.apk \
-            "build/app/outputs/flutter-apk/${{ steps.meta.outputs.apk_name }}"
+            "release/${{ steps.meta.outputs.apk_name }}"
           cp build/app/outputs/bundle/release/app-release.aab \
-            "build/app/outputs/bundle/release/${{ steps.meta.outputs.aab_name }}"
+            "release/${{ steps.meta.outputs.aab_name }}"
+          cp "release/${{ steps.meta.outputs.apk_name }}" release/coachpro.apk
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: coachpro-release-${{ steps.meta.outputs.tag }}
-          path: |
-            build/app/outputs/flutter-apk/${{ steps.meta.outputs.apk_name }}
-            build/app/outputs/bundle/release/${{ steps.meta.outputs.aab_name }}
+          path: release/
           retention-days: 30
           if-no-files-found: error
 
@@ -193,6 +193,7 @@ jobs:
           files: |
             release-assets/${{ needs.build-release.outputs.apk_name }}
             release-assets/${{ needs.build-release.outputs.aab_name }}
+            release-assets/coachpro.apk
           body: |
             ## CoachPro ${{ needs.build-release.outputs.tag }}
 
