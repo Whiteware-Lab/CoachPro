@@ -57,7 +57,6 @@ jobs:
       tag: ${{ steps.meta.outputs.tag }}
       version_name: ${{ steps.meta.outputs.version_name }}
       version_code: ${{ steps.meta.outputs.version_code }}
-      apk_name: ${{ steps.meta.outputs.apk_name }}
       aab_name: ${{ steps.meta.outputs.aab_name }}
       is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
 
@@ -160,7 +159,6 @@ jobs:
             "release/${{ steps.meta.outputs.apk_name }}"
           cp build/app/outputs/bundle/release/app-release.aab \
             "release/${{ steps.meta.outputs.aab_name }}"
-          cp "release/${{ steps.meta.outputs.apk_name }}" release/coachpro.apk
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
@@ -193,7 +191,6 @@ jobs:
           files: |
             release-assets/${{ needs.build-release.outputs.apk_name }}
             release-assets/${{ needs.build-release.outputs.aab_name }}
-            release-assets/coachpro.apk
           body: |
             ## CoachPro ${{ needs.build-release.outputs.tag }}
 
