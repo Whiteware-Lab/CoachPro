@@ -7,6 +7,7 @@ class Split {
     required this.lapNumber,
     required this.elapsedMs,
     required this.recordedAt,
+    this.name,
   });
 
   final String id;
@@ -14,6 +15,10 @@ class Split {
   final int lapNumber;
   final int elapsedMs;
   final DateTime recordedAt;
+  final String? name;
+
+  String get displayName =>
+      name?.trim().isNotEmpty == true ? name!.trim() : 'Giro $lapNumber';
 
   factory Split.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data()!;
@@ -23,6 +28,7 @@ class Split {
       lapNumber: data['lapNumber'] as int,
       elapsedMs: data['elapsedMs'] as int,
       recordedAt: (data['recordedAt'] as Timestamp).toDate(),
+      name: data['name'] as String?,
     );
   }
 
@@ -32,6 +38,7 @@ class Split {
       'lapNumber': lapNumber,
       'elapsedMs': elapsedMs,
       'recordedAt': Timestamp.fromDate(recordedAt),
+      if (name != null) 'name': name,
     };
   }
 }
@@ -69,6 +76,5 @@ List<AthleteSessionStats> buildAthleteStats(List<Split> splits) {
       laps: laps,
       totalMs: totalMs,
     );
-  }).toList()
-    ..sort((a, b) => a.totalMs.compareTo(b.totalMs));
+  }).toList()..sort((a, b) => a.totalMs.compareTo(b.totalMs));
 }

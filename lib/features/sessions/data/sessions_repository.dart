@@ -301,9 +301,10 @@ class SessionsRepository {
     if (trimmed.isEmpty) {
       throw SessionsException('Il nome della prova è obbligatorio.');
     }
-    return _subSessions(teamId, sessionId)
-        .doc(subSessionId)
-        .update({'name': trimmed});
+    return _subSessions(
+      teamId,
+      sessionId,
+    ).doc(subSessionId).update({'name': trimmed});
   }
 
   Future<void> startLapTimer({
@@ -527,6 +528,24 @@ class SessionsRepository {
       batch.delete(doc.reference);
     }
     await batch.commit();
+  }
+
+  Future<void> renameSplit({
+    required String teamId,
+    required String sessionId,
+    required String subSessionId,
+    required String splitId,
+    required String name,
+  }) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw SessionsException('Il nome del giro è obbligatorio.');
+    }
+    return _subSessionSplits(
+      teamId,
+      sessionId,
+      subSessionId,
+    ).doc(splitId).update({'name': trimmed});
   }
 
   String? _normalizeOptionalName(String? value) {

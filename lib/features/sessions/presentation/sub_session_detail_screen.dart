@@ -5,7 +5,7 @@ import 'package:coachpro/features/sessions/domain/split.dart';
 import 'package:coachpro/features/sessions/domain/sub_session_type.dart';
 import 'package:coachpro/features/sessions/providers/sessions_providers.dart';
 import 'package:coachpro/features/sessions/presentation/widgets/sub_session_name_dialog.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Split;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -47,7 +47,9 @@ class SubSessionDetailScreen extends ConsumerWidget {
     if (name == null || !context.mounted) {
       return;
     }
-    await ref.read(sessionsRepositoryProvider).updateSubSessionName(
+    await ref
+        .read(sessionsRepositoryProvider)
+        .updateSubSessionName(
           teamId: teamId,
           sessionId: sessionId,
           subSessionId: subSessionId,
@@ -181,6 +183,7 @@ class SubSessionDetailScreen extends ConsumerWidget {
                         athleteNames[stat.athleteId] ?? 'Atleta sconosciuto',
                     stats: stat,
                     showLapLabel: subSession.type == SubSessionType.lap,
+                    onRenameLap: (split) => _renameLap(context, ref, split),
                   ),
                 ),
             ],
@@ -195,6 +198,41 @@ class SubSessionDetailScreen extends ConsumerWidget {
       ),
     );
   }
+
+  Future<void> _renameLap(
+    BuildContext context,
+    WidgetRef ref,
+    Split split,
+  ) async {
+    final name = await showSubSessionNameDialog(
+      context,
+      title: 'Rinomina giro',
+      initialName: split.displayName,
+      fieldLabel: 'Nome giro',
+      hintText: 'Es. Riscaldamento, Ultimo giro',
+      confirmLabel: 'Salva',
+    );
+    if (name == null || !context.mounted) return;
+    try {
+      await ref
+          .read(sessionsRepositoryProvider)
+          .renameSplit(
+            teamId: teamId,
+            sessionId: sessionId,
+            subSessionId: subSessionId,
+            splitId: split.id,
+            name: name,
+          );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossibile rinominare il giro. Riprova.'),
+          ),
+        );
+      }
+    }
+  }
 }
 
 class _AthleteStatsCard extends StatelessWidget {
@@ -202,11 +240,13 @@ class _AthleteStatsCard extends StatelessWidget {
     required this.athleteName,
     required this.stats,
     required this.showLapLabel,
+    required this.onRenameLap,
   });
 
   final String athleteName;
   final AthleteSessionStats stats;
   final bool showLapLabel;
+  final ValueChanged<Split> onRenameLap;
 
   @override
   Widget build(BuildContext context) {
@@ -243,22 +283,30 @@ class _AthleteStatsCard extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     children: [
-                      Text(
-                        showLapLabel
-                            ? 'Giro ${entry.value.lapNumber}'
-                            : 'Tempo',
-                        style: Theme.of(context).textTheme.bodySmall,
+                      Expanded(
+                        child: Text(
+                          showLapLabel ? entry.value.displayName : 'Tempo',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       ),
-                      const Spacer(),
+                      if (showLapLabel)
+                        PopupMenuButton<String>(
+                          tooltip: 'Azioni giro',
+                          onSelected: (_) => onRenameLap(entry.value),
+                          itemBuilder: (context) => const [
+                            PopupMenuItem(
+                              value: 'rename',
+                              child: Text('Rinomina'),
+                            ),
+                          ],
+                        ),
                       if (showLapLabel)
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text(
                               'Durata ${formatElapsedMs(stats.lapDurationMs(entry.key))}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     fontFeatures: const [
@@ -268,9 +316,7 @@ class _AthleteStatsCard extends StatelessWidget {
                             ),
                             Text(
                               'Assoluto ${formatElapsedMs(entry.value.elapsedMs)}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     fontFeatures: const [
                                       FontFeature.tabularFigures(),
@@ -282,12 +328,12 @@ class _AthleteStatsCard extends StatelessWidget {
                       else
                         Text(
                           formatElapsedMs(entry.value.elapsedMs),
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
-                                  ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
                         ),
                     ],
                   ),
