@@ -1,6 +1,9 @@
 import 'package:coachpro/app/theme/app_colors.dart';
 import 'package:coachpro/features/sessions/data/sessions_repository.dart';
+import 'package:coachpro/features/sessions/domain/battery.dart';
+import 'package:coachpro/features/sessions/domain/session.dart';
 import 'package:coachpro/features/sessions/domain/session_kind.dart';
+import 'package:coachpro/features/sessions/domain/sub_session.dart';
 import 'package:coachpro/features/sessions/domain/sub_session_type.dart';
 import 'package:coachpro/features/sessions/presentation/widgets/session_tool_card.dart';
 import 'package:coachpro/features/sessions/presentation/widgets/sub_session_name_dialog.dart';
@@ -21,6 +24,29 @@ class SessionHubScreen extends ConsumerWidget {
 
   SessionKey get _sessionKey =>
       SessionKey(teamId: teamId, sessionId: sessionId);
+
+  Future<void> _renameSession(
+    BuildContext context,
+    WidgetRef ref,
+    Session session,
+  ) async {
+    final name = await showSubSessionNameDialog(
+      context,
+      title: 'Rinomina sessione',
+      initialName: session.displayTitle,
+      fieldLabel: 'Nome sessione',
+      hintText: 'Es. Test 400 metri',
+      confirmLabel: 'Salva',
+    );
+    if (name == null || !context.mounted) {
+      return;
+    }
+    await ref.read(sessionsRepositoryProvider).updateSessionName(
+          teamId: teamId,
+          sessionId: sessionId,
+          name: name,
+        );
+  }
 
   Future<void> _deleteSession(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
@@ -48,10 +74,9 @@ class SessionHubScreen extends ConsumerWidget {
       return;
     }
 
-    await ref.read(sessionsRepositoryProvider).deleteSession(
-          teamId: teamId,
-          sessionId: sessionId,
-        );
+    await ref
+        .read(sessionsRepositoryProvider)
+        .deleteSession(teamId: teamId, sessionId: sessionId);
     if (context.mounted) {
       context.pop();
     }
@@ -61,7 +86,52 @@ class SessionHubScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     SubSessionType type,
+    List<Battery> batteries,
   ) async {
+    if (batteries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Crea prima una batteria.'),
+          action: SnackBarAction(
+            label: 'Crea',
+            onPressed: () => context.pushNamed(
+              'battery-new',
+              pathParameters: {'teamId': teamId, 'sessionId': sessionId},
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+
+    Battery? battery;
+    if (batteries.length == 1) {
+      battery = batteries.first;
+    } else {
+      battery = await showDialog<Battery>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: const Text('Scegli la batteria'),
+          children: batteries
+              .map(
+                (item) => SimpleDialogOption(
+                  onPressed: () => Navigator.of(context).pop(item),
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.groups_outlined),
+                    title: Text(item.name),
+                    subtitle: Text('${item.athleteIds.length} partecipanti'),
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      );
+    }
+    if (battery == null || !context.mounted) {
+      return;
+    }
+
     final name = await showSubSessionNameDialog(
       context,
       title: type == SubSessionType.lap
@@ -73,13 +143,15 @@ class SessionHubScreen extends ConsumerWidget {
     }
 
     try {
-      final subSession =
-          await ref.read(sessionsRepositoryProvider).createSubSession(
-                teamId: teamId,
-                sessionId: sessionId,
-                name: name,
-                type: type,
-              );
+      final subSession = await ref
+          .read(sessionsRepositoryProvider)
+          .createSubSession(
+            teamId: teamId,
+            sessionId: sessionId,
+            name: name,
+            type: type,
+            battery: battery,
+          );
       if (!context.mounted) {
         return;
       }
@@ -97,11 +169,68 @@ class SessionHubScreen extends ConsumerWidget {
       );
     } on SessionsException catch (error) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
       }
     }
+  }
+
+  Future<void> _renameSubSession(
+    BuildContext context,
+    WidgetRef ref,
+    SubSession subSession,
+  ) async {
+    final name = await showSubSessionNameDialog(
+      context,
+      title: 'Rinomina prova',
+      initialName: subSession.name,
+      confirmLabel: 'Salva',
+    );
+    if (name == null || !context.mounted) {
+      return;
+    }
+    await ref.read(sessionsRepositoryProvider).updateSubSessionName(
+          teamId: teamId,
+          sessionId: sessionId,
+          subSessionId: subSession.id,
+          name: name,
+        );
+  }
+
+  Future<void> _deleteSubSession(
+    BuildContext context,
+    WidgetRef ref,
+    SubSession subSession,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Elimina prova'),
+        content: Text(
+          'Vuoi eliminare “${subSession.name}” e tutti i tempi registrati?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Elimina'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+    await ref.read(sessionsRepositoryProvider).deleteSubSession(
+          teamId: teamId,
+          sessionId: sessionId,
+          subSessionId: subSession.id,
+        );
   }
 
   void _openSubSession(
@@ -146,17 +275,23 @@ class SessionHubScreen extends ConsumerWidget {
     final sessionAsync = ref.watch(sessionProvider(_sessionKey));
     final subSessionsAsync = ref.watch(subSessionsProvider(_sessionKey));
     final notesAsync = ref.watch(sessionNotesProvider(_sessionKey));
+    final batteriesAsync = ref.watch(batteriesProvider(_sessionKey));
 
     return sessionAsync.when(
       data: (session) {
         final subSessions = subSessionsAsync.value ?? [];
         final noteCount = notesAsync.value?.length ?? 0;
-        final presentCount = session.presentAthleteIds.length;
+        final batteries = batteriesAsync.value ?? [];
 
         return Scaffold(
           appBar: AppBar(
             title: Text(session.displayTitle),
             actions: [
+              IconButton(
+                onPressed: () => _renameSession(context, ref, session),
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Rinomina sessione',
+              ),
               IconButton(
                 onPressed: () => _deleteSession(context, ref),
                 icon: const Icon(Icons.delete_outline),
@@ -190,13 +325,12 @@ class SessionHubScreen extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              session.kind.label,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
+                              session.displayTitle,
+                              style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
-                            Text(session.displayTitle),
+                            if (session.hasCustomName)
+                              Text(session.defaultTitle),
                           ],
                         ),
                       ),
@@ -205,10 +339,7 @@ class SessionHubScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              Text(
-                'Strumenti',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              Text('Strumenti', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 12),
               GridView.count(
                 shrinkWrap: true,
@@ -227,6 +358,7 @@ class SessionHubScreen extends ConsumerWidget {
                       context,
                       ref,
                       SubSessionType.lap,
+                      batteries,
                     ),
                   ),
                   SessionToolCard(
@@ -238,17 +370,18 @@ class SessionHubScreen extends ConsumerWidget {
                       context,
                       ref,
                       SubSessionType.simple,
+                      batteries,
                     ),
                   ),
                   SessionToolCard(
-                    icon: Icons.how_to_reg,
-                    title: 'Presenze',
-                    subtitle: presentCount > 0
-                        ? '$presentCount atleti presenti'
-                        : 'Segna chi è presente',
+                    icon: Icons.groups_outlined,
+                    title: 'Batterie',
+                    subtitle: batteries.isNotEmpty
+                        ? '${batteries.length} ${batteries.length == 1 ? 'batteria' : 'batterie'}'
+                        : 'Crea la prima batteria',
                     color: AppColors.success,
                     onTap: () => context.pushNamed(
-                      'session-attendance',
+                      'session-batteries',
                       pathParameters: {
                         'teamId': teamId,
                         'sessionId': sessionId,
@@ -305,9 +438,37 @@ class SessionHubScreen extends ConsumerWidget {
                       title: Text(subSession.name),
                       subtitle: Text(
                         '${subSession.type.label} · ${_formatTime(subSession.createdAt)}'
+                        '${subSession.batteryName == null ? '' : ' · ${subSession.batteryName}'}'
                         '${subSession.isActive ? ' · In corso' : ''}',
                       ),
-                      trailing: const Icon(Icons.chevron_right),
+                      trailing: PopupMenuButton<String>(
+                        tooltip: 'Azioni prova',
+                        onSelected: (value) {
+                          if (value == 'rename') {
+                            _renameSubSession(context, ref, subSession);
+                          } else if (value == 'delete') {
+                            _deleteSubSession(context, ref, subSession);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'rename',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(Icons.edit_outlined),
+                              title: Text('Rinomina'),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Elimina'),
+                            ),
+                          ),
+                        ],
+                      ),
                       onTap: () => _openSubSession(
                         context,
                         subSession.type,
@@ -321,9 +482,8 @@ class SessionHubScreen extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(
         appBar: AppBar(),
         body: Center(child: Text('Errore: $error')),

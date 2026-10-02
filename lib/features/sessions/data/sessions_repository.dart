@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:coachpro/core/utils/date_format.dart';
+import 'package:coachpro/features/sessions/domain/battery.dart';
 import 'package:coachpro/features/sessions/domain/session.dart';
 import 'package:coachpro/features/sessions/domain/session_kind.dart';
 import 'package:coachpro/features/sessions/domain/session_note.dart';
@@ -9,7 +10,7 @@ import 'package:coachpro/features/sessions/domain/sub_session_type.dart';
 
 class SessionsRepository {
   SessionsRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
@@ -19,23 +20,23 @@ class SessionsRepository {
   CollectionReference<Map<String, dynamic>> _subSessions(
     String teamId,
     String sessionId,
-  ) =>
-      _sessions(teamId).doc(sessionId).collection('subSessions');
+  ) => _sessions(teamId).doc(sessionId).collection('subSessions');
+
+  CollectionReference<Map<String, dynamic>> _batteries(
+    String teamId,
+    String sessionId,
+  ) => _sessions(teamId).doc(sessionId).collection('batteries');
 
   CollectionReference<Map<String, dynamic>> _subSessionSplits(
     String teamId,
     String sessionId,
     String subSessionId,
-  ) =>
-      _subSessions(teamId, sessionId)
-          .doc(subSessionId)
-          .collection('splits');
+  ) => _subSessions(teamId, sessionId).doc(subSessionId).collection('splits');
 
   CollectionReference<Map<String, dynamic>> _notes(
     String teamId,
     String sessionId,
-  ) =>
-      _sessions(teamId).doc(sessionId).collection('notes');
+  ) => _sessions(teamId).doc(sessionId).collection('notes');
 
   Stream<List<Session>> watchSessions(String teamId) {
     return _sessions(teamId)
@@ -80,15 +81,47 @@ class SessionsRepository {
         );
   }
 
+  Stream<List<Battery>> watchBatteries({
+    required String teamId,
+    required String sessionId,
+  }) {
+    return _batteries(teamId, sessionId)
+        .orderBy('createdAt')
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => Battery.fromFirestore(
+                  doc,
+                  teamId: teamId,
+                  sessionId: sessionId,
+                ),
+              )
+              .toList(growable: false),
+        );
+  }
+
+  Stream<Battery> watchBattery({
+    required String teamId,
+    required String sessionId,
+    required String batteryId,
+  }) {
+    return _batteries(teamId, sessionId).doc(batteryId).snapshots().map((doc) {
+      if (!doc.exists) {
+        throw StateError('Batteria non trovata');
+      }
+      return Battery.fromFirestore(doc, teamId: teamId, sessionId: sessionId);
+    });
+  }
+
   Stream<SubSession> watchSubSession({
     required String teamId,
     required String sessionId,
     required String subSessionId,
   }) {
-    return _subSessions(teamId, sessionId)
-        .doc(subSessionId)
-        .snapshots()
-        .map((doc) {
+    return _subSessions(teamId, sessionId).doc(subSessionId).snapshots().map((
+      doc,
+    ) {
       if (!doc.exists) {
         throw StateError('Prova non trovata');
       }
@@ -133,6 +166,7 @@ class SessionsRepository {
     required SessionKind kind,
     required DateTime sessionDate,
     required String createdBy,
+    String? name,
   }) async {
     final docRef = _sessions(teamId).doc();
     final session = Session(
@@ -144,10 +178,23 @@ class SessionsRepository {
       finishedAthleteIds: const [],
       createdBy: createdBy,
       createdAt: DateTime.now(),
+      name: _normalizeOptionalName(name),
     );
 
     await docRef.set(session.toFirestore());
     return session;
+  }
+
+  Future<void> updateSessionName({
+    required String teamId,
+    required String sessionId,
+    required String name,
+  }) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw SessionsException('Il nome della sessione è obbligatorio.');
+    }
+    return _sessions(teamId).doc(sessionId).update({'name': trimmed});
   }
 
   Future<SubSession> createSubSession({
@@ -155,6 +202,7 @@ class SessionsRepository {
     required String sessionId,
     required String name,
     required SubSessionType type,
+    required Battery battery,
   }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
@@ -170,10 +218,67 @@ class SessionsRepository {
       type: type,
       createdAt: DateTime.now(),
       finishedAthleteIds: const [],
+      batteryId: battery.id,
+      batteryName: battery.name,
+      participantAthleteIds: List<String>.from(battery.athleteIds),
     );
 
     await docRef.set(subSession.toFirestore());
     return subSession;
+  }
+
+  Future<Battery> createBattery({
+    required String teamId,
+    required String sessionId,
+    required String name,
+    required List<String> athleteIds,
+  }) async {
+    _validateBattery(name: name, athleteIds: athleteIds);
+    final docRef = _batteries(teamId, sessionId).doc();
+    final battery = Battery(
+      id: docRef.id,
+      teamId: teamId,
+      sessionId: sessionId,
+      name: name.trim(),
+      athleteIds: List<String>.from(athleteIds),
+      createdAt: DateTime.now(),
+    );
+    await docRef.set(battery.toFirestore());
+    return battery;
+  }
+
+  Future<void> updateBattery({
+    required String teamId,
+    required String sessionId,
+    required String batteryId,
+    required String name,
+    required List<String> athleteIds,
+  }) {
+    _validateBattery(name: name, athleteIds: athleteIds);
+    return _batteries(
+      teamId,
+      sessionId,
+    ).doc(batteryId).update({'name': name.trim(), 'athleteIds': athleteIds});
+  }
+
+  Future<void> deleteBattery({
+    required String teamId,
+    required String sessionId,
+    required String batteryId,
+  }) {
+    return _batteries(teamId, sessionId).doc(batteryId).delete();
+  }
+
+  void _validateBattery({
+    required String name,
+    required List<String> athleteIds,
+  }) {
+    if (name.trim().isEmpty) {
+      throw SessionsException('Il nome della batteria è obbligatorio.');
+    }
+    if (athleteIds.isEmpty) {
+      throw SessionsException('Seleziona almeno un partecipante.');
+    }
   }
 
   Future<void> updatePresentAthletes({
@@ -181,9 +286,24 @@ class SessionsRepository {
     required String sessionId,
     required List<String> presentAthleteIds,
   }) {
-    return _sessions(teamId).doc(sessionId).update({
-      'presentAthleteIds': presentAthleteIds,
-    });
+    return _sessions(
+      teamId,
+    ).doc(sessionId).update({'presentAthleteIds': presentAthleteIds});
+  }
+
+  Future<void> updateSubSessionName({
+    required String teamId,
+    required String sessionId,
+    required String subSessionId,
+    required String name,
+  }) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      throw SessionsException('Il nome della prova è obbligatorio.');
+    }
+    return _subSessions(teamId, sessionId)
+        .doc(subSessionId)
+        .update({'name': trimmed});
   }
 
   Future<void> startLapTimer({
@@ -241,7 +361,11 @@ class SessionsRepository {
     required String sessionId,
     required String subSessionId,
   }) async {
-    final splits = await _subSessionSplits(teamId, sessionId, subSessionId).get();
+    final splits = await _subSessionSplits(
+      teamId,
+      sessionId,
+      subSessionId,
+    ).get();
     final batch = _firestore.batch();
     for (final doc in splits.docs) {
       batch.delete(doc.reference);
@@ -263,8 +387,9 @@ class SessionsRepository {
     bool singleTapOnly = false,
   }) async {
     final splitsRef = _subSessionSplits(teamId, sessionId, subSessionId);
-    final existing =
-        await splitsRef.where('athleteId', isEqualTo: athleteId).get();
+    final existing = await splitsRef
+        .where('athleteId', isEqualTo: athleteId)
+        .get();
 
     if (singleTapOnly && existing.docs.isNotEmpty) {
       return;
@@ -342,10 +467,10 @@ class SessionsRepository {
       throw SessionsException('Il titolo della nota è obbligatorio.');
     }
 
-    await _notes(teamId, sessionId).doc(noteId).update({
-      'title': title.trim(),
-      'content': content.trim(),
-    });
+    await _notes(
+      teamId,
+      sessionId,
+    ).doc(noteId).update({'title': title.trim(), 'content': content.trim()});
   }
 
   Future<void> deleteNote({
@@ -378,6 +503,7 @@ class SessionsRepository {
       );
     }
     await _deleteSubcollection(_subSessions(teamId, sessionId));
+    await _deleteSubcollection(_batteries(teamId, sessionId));
     await _deleteSubcollection(_notes(teamId, sessionId));
     await _sessions(teamId).doc(sessionId).delete();
   }
@@ -401,6 +527,11 @@ class SessionsRepository {
       batch.delete(doc.reference);
     }
     await batch.commit();
+  }
+
+  String? _normalizeOptionalName(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 }
 

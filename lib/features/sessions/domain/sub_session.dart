@@ -10,6 +10,9 @@ class SubSession {
     required this.type,
     required this.createdAt,
     required this.finishedAthleteIds,
+    this.batteryId,
+    this.batteryName,
+    this.participantAthleteIds,
     this.endedAt,
     this.timerStartedAt,
     this.timerElapsedMs,
@@ -25,11 +28,17 @@ class SubSession {
   final DateTime? timerStartedAt;
   final int? timerElapsedMs;
   final List<String> finishedAthleteIds;
+  final String? batteryId;
+  final String? batteryName;
+  final List<String>? participantAthleteIds;
 
   bool get isActive => endedAt == null;
 
   bool isAthleteFinished(String athleteId) =>
       finishedAthleteIds.contains(athleteId);
+
+  List<String> participantsOr(List<String> legacyPresentAthleteIds) =>
+      participantAthleteIds ?? legacyPresentAthleteIds;
 
   factory SubSession.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc, {
@@ -50,6 +59,11 @@ class SubSession {
       finishedAthleteIds: List<String>.from(
         data['finishedAthleteIds'] as List? ?? [],
       ),
+      batteryId: data['batteryId'] as String?,
+      batteryName: data['batteryName'] as String?,
+      participantAthleteIds: data.containsKey('participantAthleteIds')
+          ? List<String>.from(data['participantAthleteIds'] as List? ?? [])
+          : null,
     );
   }
 
@@ -63,6 +77,10 @@ class SubSession {
         'timerStartedAt': Timestamp.fromDate(timerStartedAt!),
       if (timerElapsedMs != null) 'timerElapsedMs': timerElapsedMs,
       'finishedAthleteIds': finishedAthleteIds,
+      if (batteryId != null) 'batteryId': batteryId,
+      if (batteryName != null) 'batteryName': batteryName,
+      if (participantAthleteIds != null)
+        'participantAthleteIds': participantAthleteIds,
     };
   }
 }

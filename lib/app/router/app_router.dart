@@ -2,8 +2,10 @@ import 'package:coachpro/features/athletes/presentation/athletes_screen.dart';
 import 'package:coachpro/features/auth/presentation/login_screen.dart';
 import 'package:coachpro/features/auth/providers/auth_providers.dart';
 import 'package:coachpro/features/sessions/presentation/lap_timer_screen.dart';
+import 'package:coachpro/features/sessions/presentation/battery_editor_screen.dart';
 import 'package:coachpro/features/sessions/presentation/new_session_screen.dart';
 import 'package:coachpro/features/sessions/presentation/session_attendance_screen.dart';
+import 'package:coachpro/features/sessions/presentation/session_batteries_screen.dart';
 import 'package:coachpro/features/sessions/presentation/session_hub_screen.dart';
 import 'package:coachpro/features/sessions/presentation/session_notes_screen.dart';
 import 'package:coachpro/features/sessions/presentation/simple_timer_screen.dart';
@@ -42,34 +44,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: '/teams',
-        builder: (context, state) => const TeamsScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/teams', builder: (context, state) => const TeamsScreen()),
       GoRoute(
         name: 'team-detail',
         path: '/teams/:teamId',
-        builder: (context, state) => TeamDetailScreen(
-          teamId: state.pathParameters['teamId']!,
-        ),
+        builder: (context, state) =>
+            TeamDetailScreen(teamId: state.pathParameters['teamId']!),
         routes: [
           GoRoute(
             name: 'team-athletes',
             path: 'athletes',
-            builder: (context, state) => AthletesScreen(
-              teamId: state.pathParameters['teamId']!,
-            ),
+            builder: (context, state) =>
+                AthletesScreen(teamId: state.pathParameters['teamId']!),
           ),
           GoRoute(
             name: 'new-session',
             path: 'sessions/new',
-            builder: (context, state) => NewSessionScreen(
-              teamId: state.pathParameters['teamId']!,
-            ),
+            builder: (context, state) =>
+                NewSessionScreen(teamId: state.pathParameters['teamId']!),
           ),
           GoRoute(
             name: 'session-hub',
@@ -79,6 +72,31 @@ final routerProvider = Provider<GoRouter>((ref) {
               sessionId: state.pathParameters['sessionId']!,
             ),
             routes: [
+              GoRoute(
+                name: 'session-batteries',
+                path: 'batteries',
+                builder: (context, state) => SessionBatteriesScreen(
+                  teamId: state.pathParameters['teamId']!,
+                  sessionId: state.pathParameters['sessionId']!,
+                ),
+              ),
+              GoRoute(
+                name: 'battery-new',
+                path: 'batteries/new',
+                builder: (context, state) => BatteryEditorScreen(
+                  teamId: state.pathParameters['teamId']!,
+                  sessionId: state.pathParameters['sessionId']!,
+                ),
+              ),
+              GoRoute(
+                name: 'battery-edit',
+                path: 'batteries/:batteryId/edit',
+                builder: (context, state) => BatteryEditorScreen(
+                  teamId: state.pathParameters['teamId']!,
+                  sessionId: state.pathParameters['sessionId']!,
+                  batteryId: state.pathParameters['batteryId']!,
+                ),
+              ),
               GoRoute(
                 name: 'sub-session-detail',
                 path: 'sub-sessions/:subSessionId',

@@ -7,11 +7,15 @@ class SessionCard extends StatelessWidget {
   const SessionCard({
     required this.session,
     required this.onTap,
+    required this.onRename,
+    required this.onDelete,
     super.key,
   });
 
   final Session session;
   final VoidCallback onTap;
+  final VoidCallback onRename;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -41,15 +45,44 @@ class SessionCard extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${session.presentAthleteIds.length} presenti',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                    if (session.hasCustomName) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        session.defaultTitle,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right),
+              PopupMenuButton<String>(
+                tooltip: 'Azioni sessione',
+                onSelected: (value) {
+                  if (value == 'rename') {
+                    onRename();
+                  } else if (value == 'delete') {
+                    onDelete();
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 'rename',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.edit_outlined),
+                      title: Text('Rinomina'),
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.delete_outline),
+                      title: Text('Elimina'),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),

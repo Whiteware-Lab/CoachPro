@@ -1,6 +1,8 @@
 import 'package:coachpro/app/theme/app_colors.dart';
 import 'package:coachpro/features/athletes/providers/athletes_providers.dart';
 import 'package:coachpro/features/auth/providers/auth_providers.dart';
+import 'package:coachpro/features/sessions/domain/session.dart';
+import 'package:coachpro/features/sessions/presentation/widgets/sub_session_name_dialog.dart';
 import 'package:coachpro/features/sessions/presentation/widgets/session_card.dart';
 import 'package:coachpro/features/sessions/providers/sessions_providers.dart';
 import 'package:coachpro/features/teams/data/teams_repository.dart';
@@ -16,6 +18,63 @@ class TeamDetailScreen extends ConsumerWidget {
   const TeamDetailScreen({required this.teamId, super.key});
 
   final String teamId;
+
+  Future<void> _renameSession(
+    BuildContext context,
+    WidgetRef ref,
+    Session session,
+  ) async {
+    final name = await showSubSessionNameDialog(
+      context,
+      title: 'Rinomina sessione',
+      initialName: session.displayTitle,
+      fieldLabel: 'Nome sessione',
+      hintText: 'Es. Test 400 metri',
+      confirmLabel: 'Salva',
+    );
+    if (name == null || !context.mounted) {
+      return;
+    }
+    await ref.read(sessionsRepositoryProvider).updateSessionName(
+          teamId: teamId,
+          sessionId: session.id,
+          name: name,
+        );
+  }
+
+  Future<void> _deleteSession(
+    BuildContext context,
+    WidgetRef ref,
+    Session session,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Elimina sessione'),
+        content: Text(
+          'Vuoi eliminare “${session.displayTitle}” e tutti i dati associati?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annulla'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Elimina'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+    await ref.read(sessionsRepositoryProvider).deleteSession(
+          teamId: teamId,
+          sessionId: session.id,
+        );
+  }
 
   Future<void> _inviteCoach(
     BuildContext context,
@@ -290,6 +349,10 @@ class TeamDetailScreen extends ConsumerWidget {
                                 'sessionId': session.id,
                               },
                             ),
+                            onRename: () =>
+                                _renameSession(context, ref, session),
+                            onDelete: () =>
+                                _deleteSession(context, ref, session),
                           ),
                         ),
                       ),

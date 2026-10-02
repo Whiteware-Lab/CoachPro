@@ -79,6 +79,10 @@ service cloud.firestore {
           }
         }
 
+        match /batteries/{batteryId} {
+          allow read, write: if isCoach(teamId);
+        }
+
         match /notes/{noteId} {
           allow read, write: if isCoach(teamId);
         }

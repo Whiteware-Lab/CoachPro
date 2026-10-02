@@ -46,6 +46,12 @@ class AthleteSessionStats {
   final String athleteId;
   final List<Split> laps;
   final int totalMs;
+
+  int lapDurationMs(int index) {
+    final previousElapsedMs = index == 0 ? 0 : laps[index - 1].elapsedMs;
+    final duration = laps[index].elapsedMs - previousElapsedMs;
+    return duration < 0 ? 0 : duration;
+  }
 }
 
 List<AthleteSessionStats> buildAthleteStats(List<Split> splits) {

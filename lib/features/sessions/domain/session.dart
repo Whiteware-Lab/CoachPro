@@ -12,6 +12,7 @@ class Session {
     required this.finishedAthleteIds,
     required this.createdBy,
     required this.createdAt,
+    this.name,
     this.lapTimerStartedAt,
     this.simpleTimerElapsedMs,
     this.simpleTimerStartedAt,
@@ -25,11 +26,16 @@ class Session {
   final List<String> finishedAthleteIds;
   final String createdBy;
   final DateTime createdAt;
+  final String? name;
   final DateTime? lapTimerStartedAt;
   final int? simpleTimerElapsedMs;
   final DateTime? simpleTimerStartedAt;
 
-  String get displayTitle => '${kind.label} · ${formatSessionDate(sessionDate)}';
+  String get defaultTitle => '${kind.label} · ${formatSessionDate(sessionDate)}';
+
+  bool get hasCustomName => name?.trim().isNotEmpty == true;
+
+  String get displayTitle => hasCustomName ? name! : defaultTitle;
 
   bool isAthleteFinished(String athleteId) =>
       finishedAthleteIds.contains(athleteId);
@@ -55,6 +61,7 @@ class Session {
       ),
       createdBy: data['createdBy'] as String,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
+      name: data['name'] as String?,
       lapTimerStartedAt: (data['lapTimerStartedAt'] as Timestamp?)?.toDate() ??
           (data['startedAt'] as Timestamp?)?.toDate(),
       simpleTimerElapsedMs: data['simpleTimerElapsedMs'] as int?,
@@ -88,6 +95,7 @@ class Session {
       'finishedAthleteIds': finishedAthleteIds,
       'createdBy': createdBy,
       'createdAt': Timestamp.fromDate(createdAt),
+      if (name?.trim().isNotEmpty == true) 'name': name!.trim(),
       if (lapTimerStartedAt != null)
         'lapTimerStartedAt': Timestamp.fromDate(lapTimerStartedAt!),
       if (simpleTimerElapsedMs != null)

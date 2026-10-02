@@ -4,6 +4,7 @@ import 'package:coachpro/features/athletes/providers/athletes_providers.dart';
 import 'package:coachpro/features/sessions/domain/split.dart';
 import 'package:coachpro/features/sessions/domain/sub_session_type.dart';
 import 'package:coachpro/features/sessions/providers/sessions_providers.dart';
+import 'package:coachpro/features/sessions/presentation/widgets/sub_session_name_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -21,15 +22,37 @@ class SubSessionDetailScreen extends ConsumerWidget {
   final String subSessionId;
 
   SubSessionKey get _key => SubSessionKey(
-        teamId: teamId,
-        sessionId: sessionId,
-        subSessionId: subSessionId,
-      );
+    teamId: teamId,
+    sessionId: sessionId,
+    subSessionId: subSessionId,
+  );
 
   String _formatTime(DateTime date) {
     final h = date.hour.toString().padLeft(2, '0');
     final m = date.minute.toString().padLeft(2, '0');
     return '$h:$m';
+  }
+
+  Future<void> _rename(
+    BuildContext context,
+    WidgetRef ref,
+    String currentName,
+  ) async {
+    final name = await showSubSessionNameDialog(
+      context,
+      title: 'Rinomina prova',
+      initialName: currentName,
+      confirmLabel: 'Salva',
+    );
+    if (name == null || !context.mounted) {
+      return;
+    }
+    await ref.read(sessionsRepositoryProvider).updateSubSessionName(
+          teamId: teamId,
+          sessionId: sessionId,
+          subSessionId: subSessionId,
+          name: name,
+        );
   }
 
   @override
@@ -51,6 +74,11 @@ class SubSessionDetailScreen extends ConsumerWidget {
           appBar: AppBar(
             title: Text(subSession.name),
             actions: [
+              IconButton(
+                onPressed: () => _rename(context, ref, subSession.name),
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Rinomina prova',
+              ),
               if (subSession.isActive)
                 IconButton(
                   onPressed: () {
@@ -111,6 +139,11 @@ class SubSessionDetailScreen extends ConsumerWidget {
                         'Avviata alle ${_formatTime(subSession.createdAt)}',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
+                      if (subSession.batteryName != null)
+                        Text(
+                          'Batteria: ${subSession.batteryName}',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       if (subSession.endedAt != null)
                         Text(
                           'Terminata alle ${_formatTime(subSession.endedAt!)}',
@@ -154,9 +187,8 @@ class SubSessionDetailScreen extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(
         appBar: AppBar(),
         body: Center(child: Text('Errore: $error')),
@@ -191,8 +223,8 @@ class _AthleteStatsCard extends StatelessWidget {
                   child: Text(
                     athleteName,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 Text(
@@ -206,24 +238,57 @@ class _AthleteStatsCard extends StatelessWidget {
             ),
             if (stats.laps.length > 1 || showLapLabel) ...[
               const SizedBox(height: 8),
-              ...stats.laps.map(
-                (lap) => Padding(
+              ...stats.laps.asMap().entries.map(
+                (entry) => Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     children: [
                       Text(
-                        showLapLabel ? 'Giro ${lap.lapNumber}' : 'Tempo',
+                        showLapLabel
+                            ? 'Giro ${entry.value.lapNumber}'
+                            : 'Tempo',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       const Spacer(),
-                      Text(
-                        formatElapsedMs(lap.elapsedMs),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
+                      if (showLapLabel)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Durata ${formatElapsedMs(stats.lapDurationMs(entry.key))}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
                             ),
-                      ),
+                            Text(
+                              'Assoluto ${formatElapsedMs(entry.value.elapsedMs)}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                            ),
+                          ],
+                        )
+                      else
+                        Text(
+                          formatElapsedMs(entry.value.elapsedMs),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                        ),
                     ],
                   ),
                 ),

@@ -4,12 +4,18 @@ Future<String?> showSubSessionNameDialog(
   BuildContext context, {
   required String title,
   String? initialName,
+  String fieldLabel = 'Nome prova',
+  String hintText = 'Es. 100m, Riscaldamento, Serie 1',
+  String confirmLabel = 'Avvia',
 }) {
   return showDialog<String>(
     context: context,
     builder: (context) => _SubSessionNameDialog(
       title: title,
       initialName: initialName,
+      fieldLabel: fieldLabel,
+      hintText: hintText,
+      confirmLabel: confirmLabel,
     ),
   );
 }
@@ -18,10 +24,16 @@ class _SubSessionNameDialog extends StatefulWidget {
   const _SubSessionNameDialog({
     required this.title,
     this.initialName,
+    required this.fieldLabel,
+    required this.hintText,
+    required this.confirmLabel,
   });
 
   final String title;
   final String? initialName;
+  final String fieldLabel;
+  final String hintText;
+  final String confirmLabel;
 
   @override
   State<_SubSessionNameDialog> createState() => _SubSessionNameDialogState();
@@ -52,9 +64,9 @@ class _SubSessionNameDialogState extends State<_SubSessionNameDialog> {
         child: TextFormField(
           controller: _controller,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Nome prova',
-            hintText: 'Es. 100m, Riscaldamento, Serie 1',
+          decoration: InputDecoration(
+            labelText: widget.fieldLabel,
+            hintText: widget.hintText,
           ),
           textCapitalization: TextCapitalization.sentences,
           validator: (value) {
@@ -73,7 +85,7 @@ class _SubSessionNameDialogState extends State<_SubSessionNameDialog> {
         ),
         FilledButton(
           onPressed: _submit,
-          child: const Text('Avvia'),
+          child: Text(widget.confirmLabel),
         ),
       ],
     );

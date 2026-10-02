@@ -19,9 +19,16 @@ class NewSessionScreen extends ConsumerStatefulWidget {
 }
 
 class _NewSessionScreenState extends ConsumerState<NewSessionScreen> {
+  final _nameController = TextEditingController();
   SessionKind _kind = SessionKind.allenamento;
   DateTime _sessionDate = dateOnly(DateTime.now());
   bool _isSaving = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -43,26 +50,26 @@ class _NewSessionScreenState extends ConsumerState<NewSessionScreen> {
 
     setState(() => _isSaving = true);
     try {
-      final session = await ref.read(sessionsRepositoryProvider).createSession(
+      final session = await ref
+          .read(sessionsRepositoryProvider)
+          .createSession(
             teamId: widget.teamId,
             kind: _kind,
             sessionDate: _sessionDate,
             createdBy: user.uid,
+            name: _nameController.text,
           );
       if (mounted) {
         context.goNamed(
-          'session-hub',
-          pathParameters: {
-            'teamId': widget.teamId,
-            'sessionId': session.id,
-          },
+          'battery-new',
+          pathParameters: {'teamId': widget.teamId, 'sessionId': session.id},
         );
       }
     } on SessionsException catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error.message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
       }
     } finally {
       if (mounted) {
@@ -77,9 +84,7 @@ class _NewSessionScreenState extends ConsumerState<NewSessionScreen> {
 
     return teamAsync.when(
       data: (team) => Scaffold(
-        appBar: AppBar(
-          title: Text('Nuova sessione · ${team.name}'),
-        ),
+        appBar: AppBar(title: Text('Nuova sessione · ${team.name}')),
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -108,9 +113,22 @@ class _NewSessionScreenState extends ConsumerState<NewSessionScreen> {
               },
             ),
             const SizedBox(height: 24),
+            TextField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Nome sessione (facoltativo)',
+                hintText: 'Es. Test 400 metri',
+                prefixIcon: Icon(Icons.edit_outlined),
+              ),
+            ),
+            const SizedBox(height: 24),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.calendar_today, color: AppColors.primary),
+                leading: const Icon(
+                  Icons.calendar_today,
+                  color: AppColors.primary,
+                ),
                 title: const Text('Data'),
                 subtitle: Text(formatSessionDate(_sessionDate)),
                 trailing: const Icon(Icons.chevron_right),
@@ -121,29 +139,28 @@ class _NewSessionScreenState extends ConsumerState<NewSessionScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-              onPressed: _isSaving ? null : _createSession,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.secondary,
-                minimumSize: const Size(0, 52),
-              ),
-              child: _isSaving
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Text('Crea sessione'),
+                onPressed: _isSaving ? null : _createSession,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  minimumSize: const Size(0, 52),
+                ),
+                child: _isSaving
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text('Crea sessione'),
               ),
             ),
           ],
         ),
       ),
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(
         appBar: AppBar(),
         body: Center(child: Text('Errore: $error')),
